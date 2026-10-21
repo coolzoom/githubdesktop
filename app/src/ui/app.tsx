@@ -3993,6 +3993,7 @@ export class App extends React.Component<IAppProps, IAppState> {
           hideWhitespaceInHistoryDiff={state.hideWhitespaceInHistoryDiff}
           showDiffCheckMarks={state.showDiffCheckMarks}
           showSideBySideDiff={state.showSideBySideDiff}
+          graphCommitOrder={state.graphCommitOrder}
           focusCommitMessage={state.focusCommitMessage}
           askForConfirmationOnDiscardChanges={
             state.askForConfirmationOnDiscardChanges

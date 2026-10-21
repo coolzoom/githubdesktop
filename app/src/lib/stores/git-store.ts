@@ -90,7 +90,12 @@ import { formatCommitMessage } from '../format-commit-message'
 import { GitAuthor } from '../../models/git-author'
 import { BaseStore } from './base-store'
 import { getStashes, getStashedFiles } from '../git/stash'
-import { getGraphCommits, getGraphStashes, getStashCommits } from '../git/graph'
+import {
+  getGraphCommits,
+  getGraphStashes,
+  getStashCommits,
+  GraphCommitOrder,
+} from '../git/graph'
 import {
   IGraphStash,
   IStashEntry,
@@ -252,8 +257,8 @@ export class GitStore extends BaseStore {
    * Load a batch of commits reachable from any branch, remote branch, tag or
    * HEAD, for the commit graph.
    */
-  public async loadGraphCommitBatch(skip: number) {
-    const requestKey = `history/graph/skip/${skip}`
+  public async loadGraphCommitBatch(skip: number, order: GraphCommitOrder) {
+    const requestKey = `history/graph/${order}/skip/${skip}`
     if (this.requestsInFight.has(requestKey)) {
       return null
     }
@@ -261,7 +266,7 @@ export class GitStore extends BaseStore {
     this.requestsInFight.add(requestKey)
 
     const commits = await this.performFailableOperation(() =>
-      getGraphCommits(this.repository, GraphCommitBatchSize, skip)
+      getGraphCommits(this.repository, GraphCommitBatchSize, skip, order)
     )
 
     this.requestsInFight.delete(requestKey)

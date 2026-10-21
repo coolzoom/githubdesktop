@@ -369,6 +369,39 @@ $graph-bg45: #195969, #124082, #4f116b, #681b65, #711146, #6c1114, #7c3a28, #7c6
         color: var(--gk-text-bright);
       }
     }
+
+    .graph-order-toggle {
+      position: absolute;
+      right: 30px;
+      top: 4px;
+
+      button {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        height: 18px;
+        padding: 0 6px;
+        border: 1px solid var(--gk-border);
+        border-radius: 9px;
+        background: var(--gk-panel-bg1);
+        color: var(--gk-text-secondary);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        cursor: pointer;
+
+        .octicon {
+          width: 10px;
+          height: 10px;
+        }
+
+        &:hover {
+          color: var(--gk-text-bright);
+          background: var(--gk-panel-bg2);
+        }
+      }
+    }
   }
 
   .graph-rows {
@@ -1153,6 +1186,83 @@ $graph-bg45: #195969, #124082, #4f116b, #681b65, #711146, #6c1114, #7c3a28, #7c6
     .status-conflicted {
       color: var(--gk-purple);
     }
+  }
+}
+
+.commit-graph .graph-zone-hover {
+  height: 100%;
+}
+
+// Tooltips render in a portal outside .gk-theme, so they carry their own colours.
+.tooltip.commit-refs-tooltip-container {
+  max-width: 420px;
+  padding: 8px 10px;
+  background: #33363f;
+  border: 1px solid #393b42;
+  color: #c6c7c8;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+
+  .commit-refs-tooltip {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    text-align: left;
+  }
+
+  .ref-tooltip-commit {
+    color: #ffffff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ref-tooltip-sha {
+    margin-right: 6px;
+    color: #40c5ec;
+    font-family: var(--font-family-monospace);
+  }
+
+  .ref-tooltip-heading {
+    margin-top: 4px;
+    color: #a4a5a7;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 18px;
+
+    .octicon {
+      flex-shrink: 0;
+      color: #a4a5a7;
+    }
+
+    &.current {
+      color: #ffffff;
+      font-weight: 600;
+
+      .octicon {
+        color: #5cb85c;
+      }
+    }
+  }
+
+  .ref-tooltip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

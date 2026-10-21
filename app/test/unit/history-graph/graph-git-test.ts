@@ -9,6 +9,7 @@ import {
   getBranchTracking,
   getGraphCommits,
   getGraphStashes,
+  GraphCommitOrder,
 } from '../../../src/lib/git/graph'
 import { getCommits } from '../../../src/lib/git'
 import {
@@ -51,6 +52,42 @@ describe('history graph git', () => {
     assert.ok(shas.includes(feature))
     assert.ok(shas.includes(main))
     assert.equal(shas.length, 3)
+  })
+
+  it('keeps a branch together in topo order but not in date order', async t => {
+    const repo = await setupEmptyRepository(t)
+    await commitFile(repo, 'base')
+    const main = await git(repo, 'branch', '--show-current')
+    const date = (n: number) => ({ GIT_COMMITTER_DATE: `${n} +0000` })
+    const commitAt = async (name: string, at: number) => {
+      await writeFile(path.join(repo.path, name), name)
+      await git(repo, 'add', name)
+      const r = await exec(['commit', '-m', name], repo.path, {
+        env: { ...process.env, ...date(at) },
+      })
+      assert.equal(r.exitCode, 0, r.stderr)
+    }
+    await git(repo, 'checkout', '-b', 'feature')
+    await commitAt('f1', 2000000000)
+    await commitAt('f2', 2000000020)
+    await git(repo, 'checkout', main)
+    await commitAt('m1', 2000000010)
+    await git(repo, 'merge', '--no-ff', '-m', 'merge', 'feature')
+
+    const summariesIn = async (order: GraphCommitOrder) =>
+      (await getGraphCommits(repo, 100, 0, order)).map(c => c.summary)
+
+    assert.deepEqual((await summariesIn(GraphCommitOrder.Date)).slice(1, 4), [
+      'f2',
+      'm1',
+      'f1',
+    ])
+    const topo = await summariesIn(GraphCommitOrder.Topo)
+    assert.equal(
+      Math.abs(topo.indexOf('f1') - topo.indexOf('f2')),
+      1,
+      topo.join(', ')
+    )
   })
 
   it('adds, fetches and edits a remote with a separate push URL', async t => {

@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { GraphCommitOrder } from '../lib/git/graph'
 import { Repository } from '../models/repository'
 import { CommitOneLine } from '../models/commit'
 import { TipState } from '../models/tip'
@@ -57,6 +58,7 @@ interface IRepositoryViewProps {
   readonly hideWhitespaceInChangesDiff: boolean
   readonly hideWhitespaceInHistoryDiff: boolean
   readonly showSideBySideDiff: boolean
+  readonly graphCommitOrder: GraphCommitOrder
   readonly showDiffCheckMarks: boolean
   readonly askForConfirmationOnDiscardChanges: boolean
   readonly askForConfirmationOnCommitFilteredChanges: boolean
@@ -497,6 +499,7 @@ export class RepositoryView extends React.Component<
         imageDiffType={this.props.imageDiffType}
         hideWhitespaceInDiff={this.props.hideWhitespaceInHistoryDiff}
         showSideBySideDiff={this.props.showSideBySideDiff}
+        graphCommitOrder={this.props.graphCommitOrder}
         onOpenBinaryFile={this.onOpenBinaryFile}
         onOpenSubmodule={this.onOpenSubmodule}
         onChangeImageDiffType={this.onChangeImageDiffType}

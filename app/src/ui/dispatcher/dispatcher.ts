@@ -1,4 +1,5 @@
 import { Disposable } from 'event-kit'
+import { GraphCommitOrder } from '../../lib/git/graph'
 
 import {
   IAPIOrganization,
@@ -2426,6 +2427,11 @@ export class Dispatcher {
       repository,
       file
     )
+  }
+
+  /** Change how the commit graph sorts commits and reload it */
+  public setGraphCommitOrder(repository: Repository, order: GraphCommitOrder) {
+    return this.appStore._setGraphCommitOrder(repository, order)
   }
 
   /** Change the side by side diff setting */

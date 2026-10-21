@@ -9,9 +9,10 @@ import { Emoji } from '../../lib/emoji'
 import { formatDate } from '../../lib/format-date'
 import { getAvatarUsersForCommit } from '../../models/avatar'
 import { showContextualMenu } from '../../lib/menu-item'
-import { IBranchTracking } from '../../lib/git/graph'
+import { GraphCommitOrder, IBranchTracking } from '../../lib/git/graph'
 import { List } from '../lib/list'
 import { TooltippedContent } from '../lib/tooltipped-content'
+import { TooltipDirection } from '../lib/tooltip'
 import { Avatar } from '../lib/avatar'
 import { RichText } from '../lib/rich-text'
 import { Octicon } from '../octicons'
@@ -66,6 +67,8 @@ interface ICommitGraphProps {
   readonly workDirChangeCount: number
   /** Ahead/behind counts of local branches, keyed by branch name */
   readonly tracking: ReadonlyMap<string, IBranchTracking>
+  readonly commitOrder: GraphCommitOrder
+  readonly onCommitOrderChanged: (order: GraphCommitOrder) => void
   /** The number of commits loaded, used to page in more history */
   readonly loadedCount: number
   readonly searchText: string
@@ -377,6 +380,19 @@ export class CommitGraph extends React.Component<
       },
       { type: 'separator' },
       {
+        label: 'Sort by Date (--date-order)',
+        type: 'checkbox',
+        checked: this.props.commitOrder === GraphCommitOrder.Date,
+        action: () => this.props.onCommitOrderChanged(GraphCommitOrder.Date),
+      },
+      {
+        label: 'Sort by Topology (--topo-order)',
+        type: 'checkbox',
+        checked: this.props.commitOrder === GraphCommitOrder.Topo,
+        action: () => this.props.onCommitOrderChanged(GraphCommitOrder.Topo),
+      },
+      { type: 'separator' },
+      {
         label: 'Compact Graph',
         type: 'checkbox',
         checked: columns.compact,
@@ -389,6 +405,39 @@ export class CommitGraph extends React.Component<
         action: () => graphViewStore.resetColumns(),
       },
     ])
+  }
+
+  private onToggleCommitOrder = () => {
+    this.props.onCommitOrderChanged(
+      this.props.commitOrder === GraphCommitOrder.Date
+        ? GraphCommitOrder.Topo
+        : GraphCommitOrder.Date
+    )
+  }
+
+  private renderCommitOrderButton() {
+    const isTopo = this.props.commitOrder === GraphCommitOrder.Topo
+    return (
+      <TooltippedContent
+        className="graph-order-toggle"
+        tagName="span"
+        tooltip={
+          isTopo
+            ? 'Sorted by topology (--topo-order). Click to sort by date.'
+            : 'Sorted by date (--date-order). Click to sort by topology.'
+        }
+      >
+        <button
+          onClick={this.onToggleCommitOrder}
+          aria-label={
+            isTopo ? 'Sort commits by date' : 'Sort commits by topology'
+          }
+        >
+          <Octicon symbol={isTopo ? octicons.gitBranch : octicons.clock} />
+          {isTopo ? 'Topo' : 'Date'}
+        </button>
+      </TooltippedContent>
+    )
   }
 
   private renderHeader() {
@@ -425,6 +474,7 @@ export class CommitGraph extends React.Component<
             SHA
           </div>
         ) : null}
+        {this.renderCommitOrderButton()}
         <button
           className="graph-settings-button"
           onClick={this.onSettingsClick}
@@ -558,6 +608,46 @@ export class CommitGraph extends React.Component<
     )
   }
 
+  /** Every branch and tag at a commit, shown when hovering its row. */
+  private renderRefsTooltip(row: IGraphRow, commit: Commit) {
+    const refs = row.refGroups.flatMap(g => g.refs)
+    if (refs.length === 0) {
+      return undefined
+    }
+    const branches = refs.filter(r => r.kind !== GraphRefKind.Tag)
+    const tags = refs.filter(r => r.kind === GraphRefKind.Tag)
+    const renderRef = (ref: IGraphRef) => (
+      <li key={ref.id} className={classNames({ current: ref.isCurrent })}>
+        <Octicon symbol={ref.isCurrent ? octicons.check : refIcon(ref)} />
+        <span className="ref-tooltip-name">{ref.name}</span>
+      </li>
+    )
+    return (
+      <div className="commit-refs-tooltip">
+        <div className="ref-tooltip-commit">
+          <span className="ref-tooltip-sha">{commit.sha.slice(0, 7)}</span>
+          {commit.summary}
+        </div>
+        {branches.length > 0 ? (
+          <>
+            <div className="ref-tooltip-heading">
+              {branches.length === 1 ? 'Branch' : 'Branches'}
+            </div>
+            <ul>{branches.map(renderRef)}</ul>
+          </>
+        ) : null}
+        {tags.length > 0 ? (
+          <>
+            <div className="ref-tooltip-heading">
+              {tags.length === 1 ? 'Tag' : 'Tags'}
+            </div>
+            <ul>{tags.map(renderRef)}</ul>
+          </>
+        ) : null}
+      </div>
+    )
+  }
+
   private renderAvatar(commit: Commit) {
     const users = getAvatarUsersForCommit(this.props.gitHubRepository, commit)
     if (users.length === 0) {
@@ -626,6 +716,7 @@ export class CommitGraph extends React.Component<
     const stash = this.props.stashes.get(row.sha)
     const summary = stash?.message ?? commit.summary
     const hasRefs = row.refGroups.length > 0 || row.type === GraphRowType.Stash
+    const refsTooltip = this.renderRefsTooltip(row, commit)
     const date = formatDate(commit.author.date, {
       dateStyle: 'short',
       timeStyle: 'short',
@@ -645,17 +736,31 @@ export class CommitGraph extends React.Component<
       >
         {this.renderRefZone(row)}
         <div className="zone graph-zone" style={{ width: this.graphWidth }}>
-          <GraphCell
-            row={row}
-            width={this.graphWidth}
-            metrics={this.metrics}
-            hasRefs={hasRefs}
-            isSelected={isSelected}
-            avatar={this.renderAvatar(commit)}
-            nodeTitle={`${commit.author.name} <${commit.author.email}>`}
-          />
+          <TooltippedContent
+            tagName="div"
+            className="graph-zone-hover"
+            tooltip={refsTooltip}
+            tooltipClassName="commit-refs-tooltip-container"
+            direction={TooltipDirection.EAST}
+          >
+            <GraphCell
+              row={row}
+              width={this.graphWidth}
+              metrics={this.metrics}
+              hasRefs={hasRefs}
+              isSelected={isSelected}
+              avatar={this.renderAvatar(commit)}
+              nodeTitle={`${commit.author.name} <${commit.author.email}>`}
+            />
+          </TooltippedContent>
         </div>
-        <div className="zone message-zone">
+        <TooltippedContent
+          tagName="div"
+          className="zone message-zone"
+          tooltip={refsTooltip}
+          tooltipClassName="commit-refs-tooltip-container"
+          direction={TooltipDirection.SOUTH}
+        >
           <RichText
             className="message-summary"
             emoji={this.props.emoji}
@@ -665,7 +770,7 @@ export class CommitGraph extends React.Component<
           {body.length > 0 ? (
             <span className="message-body">{body}</span>
           ) : null}
-        </div>
+        </TooltippedContent>
         {columns.showAuthor ? (
           <div
             className="zone author-zone"

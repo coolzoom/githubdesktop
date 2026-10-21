@@ -5,6 +5,14 @@ import { Repository } from '../../models/repository'
 import { Commit } from '../../models/commit'
 import { IGraphStash } from '../../models/stash-entry'
 
+/** How the commit graph sorts commits. */
+export enum GraphCommitOrder {
+  /** Newest first by commit date, interleaving branches (`--date-order`) */
+  Date = 'date',
+  /** Each branch's commits kept together (`--topo-order`) */
+  Topo = 'topo',
+}
+
 /**
  * Load a batch of commits reachable from HEAD and every local branch, remote
  * branch and tag, newest first, in the order the commit graph draws them.
@@ -12,13 +20,14 @@ import { IGraphStash } from '../../models/stash-entry'
 export function getGraphCommits(
   repository: Repository,
   limit: number,
-  skip: number
+  skip: number,
+  order: GraphCommitOrder = GraphCommitOrder.Date
 ): Promise<ReadonlyArray<Commit>> {
   return getCommits(repository, 'HEAD', limit, skip, [
     '--branches',
     '--remotes',
     '--tags',
-    '--date-order',
+    order === GraphCommitOrder.Topo ? '--topo-order' : '--date-order',
   ])
 }
 

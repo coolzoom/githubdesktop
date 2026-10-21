@@ -69,6 +69,7 @@ import { IAPIRepoRuleset } from './api'
 import { ICustomIntegration } from './custom-integration'
 import { Emoji } from './emoji'
 import { IUpdateState } from '../ui/lib/update-store'
+import { GraphCommitOrder } from './git/graph'
 
 export enum SelectionType {
   Repository,
@@ -301,6 +302,9 @@ export interface IAppState {
 
   /** Whether we should show side by side diffs */
   readonly showSideBySideDiff: boolean
+
+  /** How the History commit graph sorts commits */
+  readonly graphCommitOrder: GraphCommitOrder
 
   /** The user's preferred shell. */
   readonly selectedShell: Shell

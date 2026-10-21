@@ -307,6 +307,7 @@ import {
 import { ManualConflictResolution } from '../../models/manual-conflict-resolution'
 import { BranchPruner } from './helpers/branch-pruner'
 import { getGraphRefsKey, insertGraphStashes } from './helpers/graph-history'
+import { GraphCommitOrder } from '../git/graph'
 import {
   enableCopilotConflictResolution,
   enableCopilotAppHandoff,
@@ -593,6 +594,7 @@ export const showChangesFilterKey = 'show-changes-filter'
 // per account, not globally.
 const selectedCopilotModelsKey = 'selected-copilot-models'
 const selectedCopilotModelsByAccountKey = 'selected-copilot-models-by-account'
+const graphCommitOrderKey = 'commit-graph-order'
 export const showChangesFilterDefault = true
 
 export class AppStore extends TypedBaseStore<IAppState> {
@@ -686,6 +688,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
   /** Whether or not the spellchecker is enabled for commit summary and description */
   private commitSpellcheckEnabled: boolean = commitSpellcheckEnabledDefault
   private showSideBySideDiff: boolean = ShowSideBySideDiffDefault
+  private graphCommitOrder: GraphCommitOrder = GraphCommitOrder.Date
 
   private uncommittedChangesStrategy = defaultUncommittedChangesStrategy
 
@@ -1321,6 +1324,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       hideWhitespaceInHistoryDiff: this.hideWhitespaceInHistoryDiff,
       hideWhitespaceInPullRequestDiff: this.hideWhitespaceInPullRequestDiff,
       showSideBySideDiff: this.showSideBySideDiff,
+      graphCommitOrder: this.graphCommitOrder,
       selectedShell: this.selectedShell,
       repositoryFilterText: this.repositoryFilterText,
       resolvedExternalEditor: this.resolvedExternalEditor,
@@ -1817,7 +1821,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
       const refsKey =
         currentSha === null
           ? null
-          : getGraphRefsKey(
+          : `${this.graphCommitOrder}\n` +
+            getGraphRefsKey(
               currentSha,
               gitStore.allBranches,
               gitStore.localTags,
@@ -1838,7 +1843,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
       }
 
       // load initial group of commits for all refs
-      const loaded = await gitStore.loadGraphCommitBatch(0)
+      const loaded = await gitStore.loadGraphCommitBatch(
+        0,
+        this.graphCommitOrder
+      )
 
       if (loaded === null) {
         return
@@ -2003,7 +2011,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
         sha => !stashShas.has(sha)
       )
 
-      const newCommits = await gitStore.loadGraphCommitBatch(commits.length)
+      const newCommits = await gitStore.loadGraphCommitBatch(
+        commits.length,
+        this.graphCommitOrder
+      )
 
       if (!newCommits || newCommits.length === 0) {
         return
@@ -2600,6 +2611,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
       commitSpellcheckEnabledDefault
     )
     this.showSideBySideDiff = getShowSideBySideDiff()
+    this.graphCommitOrder =
+      getEnum(graphCommitOrderKey, GraphCommitOrder) ?? GraphCommitOrder.Date
 
     this.selectedTheme = getPersistedThemeName()
     // Make sure the persisted theme is applied
@@ -8063,6 +8076,20 @@ export class AppStore extends TypedBaseStore<IAppState> {
       this.statsStore.increment('diffModeChangeCount')
       this.emitUpdate()
     }
+  }
+
+  /** Change how the commit graph sorts commits and reload it. */
+  public async _setGraphCommitOrder(
+    repository: Repository,
+    order: GraphCommitOrder
+  ) {
+    if (order === this.graphCommitOrder) {
+      return
+    }
+    localStorage.setItem(graphCommitOrderKey, order)
+    this.graphCommitOrder = order
+    this.emitUpdate()
+    await this._executeCompare(repository, { kind: HistoryTabMode.History })
   }
 
   public _setUpdateBannerVisibility(visibility: boolean) {

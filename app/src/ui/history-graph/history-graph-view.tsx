@@ -9,6 +9,7 @@ import { IGraphStash } from '../../models/stash-entry'
 import { CommittedFileChange } from '../../models/status'
 import { ImageDiffType } from '../../models/diff'
 import { TipState } from '../../models/tip'
+import { GraphCommitOrder } from '../../lib/git/graph'
 import {
   HistoryTabMode,
   IRepositoryState,
@@ -49,6 +50,7 @@ interface IHistoryGraphViewProps {
   readonly imageDiffType: ImageDiffType
   readonly hideWhitespaceInDiff: boolean
   readonly showSideBySideDiff: boolean
+  readonly graphCommitOrder: GraphCommitOrder
   readonly onOpenBinaryFile: (fullPath: string) => void
   readonly onOpenSubmodule: (fullPath: string) => void
   readonly onChangeImageDiffType: (type: ImageDiffType) => void
@@ -363,6 +365,10 @@ export class HistoryGraphView extends React.Component<
     )
   }
 
+  private onCommitOrderChanged = (order: GraphCommitOrder) => {
+    this.props.dispatcher.setGraphCommitOrder(this.props.repository, order)
+  }
+
   private renderGraph() {
     const { state, repository } = this.props
     const graph = this.graph
@@ -377,6 +383,8 @@ export class HistoryGraphView extends React.Component<
         gitHubRepository={repository.gitHubRepository}
         workDirChangeCount={this.workDirChangeCount}
         tracking={graphViewStore.getTracking(repository.id)}
+        commitOrder={this.props.graphCommitOrder}
+        onCommitOrderChanged={this.onCommitOrderChanged}
         loadedCount={state.compareState.commitSHAs.length}
         searchText={this.state.searchText}
         onSearchTextChanged={this.onSearchTextChanged}
