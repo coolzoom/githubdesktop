@@ -128,7 +128,7 @@
   }
 
   .merge-save-prompt {
-    background: rgba(222, 155, 67, 0.15);
+    background: color-mix(in srgb, var(--color-conflicted) 15%, transparent);
     color: var(--gk-text-bright);
 
     .octicon {
@@ -141,7 +141,7 @@
   }
 
   .merge-auto-resolved {
-    background: rgba(92, 184, 92, 0.12);
+    background: color-mix(in srgb, var(--color-new) 12%, transparent);
     color: var(--gk-text-bright);
 
     .octicon {
@@ -296,7 +296,7 @@
     }
 
     &.placeholder .merge-line-text {
-      background: repeating-linear-gradient(-45deg, transparent 0 4px, rgba(255, 255, 255, 0.04) 4px 8px);
+      background: repeating-linear-gradient(-45deg, transparent 0 4px, color-mix(in srgb, var(--text-color) 4%, transparent) 4px 8px);
       flex: 1 1 auto;
     }
   }
@@ -327,7 +327,7 @@
     cursor: pointer;
 
     &:hover {
-      background: rgba(255, 255, 255, 0.06);
+      background: color-mix(in srgb, var(--text-color) 6%, transparent);
     }
 
     &:focus-visible {
@@ -386,8 +386,8 @@
   max-width: none;
   max-height: none;
   overflow: hidden;
-  border-color: #393b42;
-  background: #1c1e23;
+  border-color: var(--box-border-color);
+  background: var(--background-color);
 
   form,
   fieldset {
@@ -404,13 +404,13 @@
 #history-graph-view .conflict-bar {
   flex-shrink: 0;
   padding: 8px 10px;
-  background: rgba(222, 155, 67, 0.12);
+  background: color-mix(in srgb, var(--color-conflicted) 12%, transparent);
   border-bottom: 1px solid var(--gk-border);
   color: var(--gk-text);
   font-size: 12px;
 
   &.done {
-    background: rgba(92, 184, 92, 0.12);
+    background: color-mix(in srgb, var(--color-new) 12%, transparent);
 
     .conflict-bar-summary > .octicon {
       color: var(--gk-green);
@@ -491,7 +491,7 @@
     }
 
     &:hover {
-      background: rgba(222, 155, 67, 0.2);
+      background: color-mix(in srgb, var(--color-conflicted) 20%, transparent);
     }
 
     &.resolved {

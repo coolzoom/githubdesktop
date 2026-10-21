@@ -1,53 +1,45 @@
 // GitKraken-style History view: ref panel, commit graph and details panel.
-// Colours and metrics come from GitKraken's dark theme.
+// Layout and metrics come from GitKraken; colours follow Desktop's Appearance
+// theme so the view matches the rest of the app in light and dark mode.
 
 $graph-colors: #15a0bf, #0669f7, #8e00c2, #c517b6, #d90171, #cd0101, #f25d2e, #f2ca33, #7bd938, #2ece9d;
-$graph-bg15: #1b323a, #192943, #2d1a3b, #351d39, #381a2f, #371a1e, #3c2725, #3c3825, #2a3a26, #1f3835;
-$graph-bg25: #1a3f4a, #173158, #39174b, #461c48, #4b1737, #48171b, #522e26, #524927, #344d28, #214a42;
-$graph-bg45: #195969, #124082, #4f116b, #681b65, #711146, #6c1114, #7c3a28, #7c6b2a, #47722c, #246d5a;
+
+@function gk-tint($color, $amount) {
+  @return color-mix(in srgb, #{$color} #{$amount}, var(--background-color));
+}
 
 .gk-theme {
-  --gk-app-bg: #1c1e23;
-  --gk-panel-bg: #272a31;
-  --gk-panel-bg1: #33363f;
-  --gk-panel-bg2: #3e424e;
-  --gk-border: #393b42;
-  --gk-text: #c6c7c8;
-  --gk-text-bright: #ffffff;
-  --gk-text-secondary: #a4a5a7;
-  --gk-text-disabled: #77787b;
-  --gk-accent: #93a9ec;
-  --gk-link: #40c5ec;
-  --gk-hover-row: #212939;
-  --gk-selected-row: #26334f;
-  --gk-green: #5cb85c;
-  --gk-red: #d9413d;
-  --gk-orange: #de9b43;
+  --gk-app-bg: var(--background-color);
+  --gk-panel-bg: var(--box-alt-background-color);
+  --gk-panel-bg1: #{gk-tint(var(--text-color), 8%)};
+  --gk-panel-bg2: #{gk-tint(var(--text-color), 14%)};
+  --gk-border: var(--box-border-color);
+  --gk-text: var(--text-color);
+  --gk-text-bright: var(--text-color);
+  --gk-text-secondary: var(--text-secondary-color);
+  --gk-text-disabled: var(--text-secondary-color-muted);
+  --gk-accent: var(--focus-color);
+  --gk-link: var(--link-button-color);
+  --gk-hover-row: var(--box-hover-background-color);
+  --gk-selected-row: #{gk-tint(var(--focus-color), 18%)};
+  --gk-green: var(--color-new);
+  --gk-red: var(--color-deleted);
+  --gk-orange: var(--color-conflicted);
   --gk-blue: #4d88ff;
   --gk-purple: #bc7eff;
-  --gk-input-bg: rgba(0, 0, 0, 0.2);
+  --gk-input-bg: var(--box-background-color);
 
   @for $i from 1 through 10 {
     --graph-color-#{$i - 1}: #{nth($graph-colors, $i)};
-    --graph-color-#{$i - 1}-bg15: #{nth($graph-bg15, $i)};
-    --graph-color-#{$i - 1}-bg25: #{nth($graph-bg25, $i)};
-    --graph-color-#{$i - 1}-bg45: #{nth($graph-bg45, $i)};
+    --graph-color-#{$i - 1}-bg15: #{gk-tint(nth($graph-colors, $i), 15%)};
+    --graph-color-#{$i - 1}-bg25: #{gk-tint(nth($graph-colors, $i), 25%)};
+    --graph-color-#{$i - 1}-bg45: #{gk-tint(nth($graph-colors, $i), 45%)};
   }
 
-  // Desktop's own components inside these panels follow the dark palette.
-  --background-color: var(--gk-app-bg);
-  --text-color: var(--gk-text);
-  --text-secondary-color: var(--gk-text-secondary);
-  --box-border-color: var(--gk-border);
   --box-selected-background-color: var(--gk-selected-row);
   --box-selected-active-background-color: var(--gk-selected-row);
-  --box-selected-active-text-color: var(--gk-text-bright);
-  --box-selected-text-color: var(--gk-text-bright);
-  --box-hover-background-color: var(--gk-hover-row);
-  --list-item-hover-background-color: var(--gk-hover-row);
-  --box-background-color: var(--gk-panel-bg);
-  --secondary-button-background: var(--gk-panel-bg1);
-  --secondary-button-text-color: var(--gk-text);
+  --box-selected-active-text-color: var(--text-color);
+  --box-selected-text-color: var(--text-color);
 
   background: var(--gk-app-bg);
   color: var(--gk-text);
@@ -71,9 +63,9 @@ $graph-bg45: #195969, #124082, #4f116b, #681b65, #711146, #6c1114, #7c3a28, #7c6
 @for $i from 1 through 10 {
   .lane-#{$i - 1} {
     --lane: #{nth($graph-colors, $i)};
-    --lane-bg15: #{nth($graph-bg15, $i)};
-    --lane-bg25: #{nth($graph-bg25, $i)};
-    --lane-bg45: #{nth($graph-bg45, $i)};
+    --lane-bg15: #{gk-tint(nth($graph-colors, $i), 15%)};
+    --lane-bg25: #{gk-tint(nth($graph-colors, $i), 25%)};
+    --lane-bg45: #{gk-tint(nth($graph-colors, $i), 45%)};
   }
 }
 
@@ -105,7 +97,7 @@ $graph-bg45: #195969, #124082, #4f116b, #681b65, #711146, #6c1114, #7c3a28, #7c6
     border: 1px solid var(--gk-border);
     border-top: none;
     border-radius: 0 0 6px 6px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 24px var(--shadow-color);
     font-size: 12px;
 
     .remote-form-header {
@@ -1193,14 +1185,14 @@ $graph-bg45: #195969, #124082, #4f116b, #681b65, #711146, #6c1114, #7c3a28, #7c6
   height: 100%;
 }
 
-// Tooltips render in a portal outside .gk-theme, so they carry their own colours.
+// Tooltips render in a portal outside .gk-theme, so they use Desktop's variables directly.
 .tooltip.commit-refs-tooltip-container {
   max-width: 420px;
   padding: 8px 10px;
-  background: #33363f;
-  border: 1px solid #393b42;
-  color: #c6c7c8;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  background: var(--box-alt-background-color);
+  border: 1px solid var(--box-border-color);
+  color: var(--text-color);
+  box-shadow: 0 6px 18px var(--shadow-color);
 
   .commit-refs-tooltip {
     display: flex;
@@ -1211,7 +1203,7 @@ $graph-bg45: #195969, #124082, #4f116b, #681b65, #711146, #6c1114, #7c3a28, #7c6
   }
 
   .ref-tooltip-commit {
-    color: #ffffff;
+    color: var(--text-color);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1219,13 +1211,13 @@ $graph-bg45: #195969, #124082, #4f116b, #681b65, #711146, #6c1114, #7c3a28, #7c6
 
   .ref-tooltip-sha {
     margin-right: 6px;
-    color: #40c5ec;
+    color: var(--link-button-color);
     font-family: var(--font-family-monospace);
   }
 
   .ref-tooltip-heading {
     margin-top: 4px;
-    color: #a4a5a7;
+    color: var(--text-secondary-color);
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -1246,15 +1238,15 @@ $graph-bg45: #195969, #124082, #4f116b, #681b65, #711146, #6c1114, #7c3a28, #7c6
 
     .octicon {
       flex-shrink: 0;
-      color: #a4a5a7;
+      color: var(--text-secondary-color);
     }
 
     &.current {
-      color: #ffffff;
+      color: var(--text-color);
       font-weight: 600;
 
       .octicon {
-        color: #5cb85c;
+        color: var(--color-new);
       }
     }
   }
