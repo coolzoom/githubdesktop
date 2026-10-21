@@ -573,6 +573,7 @@ export const showDiffCheckMarksDefault = true
 export const showDiffCheckMarksKey = 'diff-check-marks-visible'
 
 const classicRepositoryLayoutKey = 'classic-repository-layout'
+const showTerminalPanelKey = 'show-terminal-panel'
 
 const alwaysShowWorktreeListKey = 'always-show-worktree-list'
 
@@ -752,6 +753,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
   private showDiffCheckMarks: boolean = showDiffCheckMarksDefault
   private classicRepositoryLayout: boolean = false
+  private showTerminalPanel: boolean = false
   private alwaysShowWorktreeList: boolean = false
 
   private preferAbsoluteDates: boolean = false
@@ -1359,6 +1361,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       underlineLinks: this.underlineLinks,
       showDiffCheckMarks: this.showDiffCheckMarks,
       classicRepositoryLayout: this.classicRepositoryLayout,
+      showTerminalPanel: this.showTerminalPanel,
       alwaysShowWorktreeList: this.alwaysShowWorktreeList,
       preferAbsoluteDates: this.preferAbsoluteDates,
       updateState: updateStore.state,
@@ -2670,6 +2673,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
     )
 
     this.classicRepositoryLayout = getBoolean(classicRepositoryLayoutKey, false)
+    this.showTerminalPanel = getBoolean(showTerminalPanelKey, false)
 
     this.preferAbsoluteDates = getPreferAbsoluteDates()
 
@@ -10453,6 +10457,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
     if (classic !== this.classicRepositoryLayout) {
       this.classicRepositoryLayout = classic
       setBoolean(classicRepositoryLayoutKey, classic)
+      this.emitUpdate()
+    }
+  }
+
+  /** This shouldn't be called directly. See 'Dispatcher'. */
+  public _setShowTerminalPanel(show: boolean) {
+    if (show !== this.showTerminalPanel) {
+      this.showTerminalPanel = show
+      setBoolean(showTerminalPanelKey, show)
       this.emitUpdate()
     }
   }

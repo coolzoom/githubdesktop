@@ -72,6 +72,8 @@ interface ICommitGraphProps {
   readonly canPopStash: boolean
   readonly onStash: () => void
   readonly onPopStash: () => void
+  readonly isTerminalVisible: boolean
+  readonly onToggleTerminal: () => void
   /** The number of commits loaded, used to page in more history */
   readonly loadedCount: number
   readonly searchText: string
@@ -455,7 +457,51 @@ export class CommitGraph extends React.Component<
           GRAPH
           {this.renderHandle('graphWidth')}
         </div>
-        <div className="zone message-zone">COMMIT MESSAGE</div>
+        <div className="zone message-zone">
+          COMMIT MESSAGE
+          <div className="graph-header-actions">
+            <TooltippedContent tagName="span" tooltip="Stash all changes">
+              <button
+                type="button"
+                disabled={this.props.workDirChangeCount === 0}
+                onClick={this.props.onStash}
+                aria-label="Stash all changes"
+              >
+                <Octicon symbol={octicons.archive} />
+              </button>
+            </TooltippedContent>
+            <TooltippedContent
+              tagName="span"
+              tooltip="Pop the latest stash (its changes come back unstaged)"
+            >
+              <button
+                type="button"
+                disabled={!this.props.canPopStash}
+                onClick={this.props.onPopStash}
+                aria-label="Pop the latest stash"
+              >
+                <Octicon symbol={octicons.unfold} />
+              </button>
+            </TooltippedContent>
+            <TooltippedContent
+              tagName="span"
+              tooltip={`${
+                this.props.isTerminalVisible ? 'Hide' : 'Show'
+              } terminal (Ctrl+\`)`}
+            >
+              <button
+                type="button"
+                className={this.props.isTerminalVisible ? 'active' : undefined}
+                onClick={this.props.onToggleTerminal}
+                aria-label="Toggle terminal"
+                aria-pressed={this.props.isTerminalVisible}
+              >
+                <Octicon symbol={octicons.terminal} />
+              </button>
+            </TooltippedContent>
+            {this.renderCommitOrderButton()}
+          </div>
+        </div>
         {columns.showAuthor ? (
           <div
             className="zone author-zone"
@@ -477,32 +523,6 @@ export class CommitGraph extends React.Component<
             SHA
           </div>
         ) : null}
-        <div className="graph-header-actions">
-          <TooltippedContent tagName="span" tooltip="Stash all changes">
-            <button
-              type="button"
-              disabled={this.props.workDirChangeCount === 0}
-              onClick={this.props.onStash}
-              aria-label="Stash all changes"
-            >
-              <Octicon symbol={octicons.archive} />
-            </button>
-          </TooltippedContent>
-          <TooltippedContent
-            tagName="span"
-            tooltip="Pop the latest stash (its changes come back unstaged)"
-          >
-            <button
-              type="button"
-              disabled={!this.props.canPopStash}
-              onClick={this.props.onPopStash}
-              aria-label="Pop the latest stash"
-            >
-              <Octicon symbol={octicons.unfold} />
-            </button>
-          </TooltippedContent>
-          {this.renderCommitOrderButton()}
-        </div>
         <button
           className="graph-settings-button"
           onClick={this.onSettingsClick}

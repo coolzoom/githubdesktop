@@ -468,6 +468,10 @@ export class App extends React.Component<IAppProps, IAppState> {
         return this.showChanges(true)
       case 'show-history':
         return this.showHistory(true)
+      case 'toggle-terminal':
+        return this.props.dispatcher.setShowTerminalPanel(
+          !this.state.showTerminalPanel
+        )
       case 'choose-repository':
         return this.chooseRepository()
       case 'add-local-repository':
@@ -4009,6 +4013,7 @@ export class App extends React.Component<IAppProps, IAppState> {
           showSideBySideDiff={state.showSideBySideDiff}
           graphCommitOrder={state.graphCommitOrder}
           classicRepositoryLayout={state.classicRepositoryLayout}
+          showTerminalPanel={state.showTerminalPanel}
           focusCommitMessage={state.focusCommitMessage}
           askForConfirmationOnDiscardChanges={
             state.askForConfirmationOnDiscardChanges

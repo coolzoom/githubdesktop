@@ -6,7 +6,7 @@ import { getReplacements } from './app-info'
 import { getDistArchitecture } from '../script/dist-info'
 import { getKoffiWebpackConfig } from '../script/webpack-koffi'
 
-export const externals = ['7zip']
+export const externals = ['7zip', 'node-pty']
 
 const outputDir = 'out'
 export const replacements = getReplacements()

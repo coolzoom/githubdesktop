@@ -46,6 +46,8 @@ import { ConflictBar, getConflictInfo } from './conflict-bar'
 import { MergeConflictEditor } from '../merge-conflict-editor/merge-conflict-editor'
 import { IWipCommitOptions, IWipFileSelection, WipPanel } from './wip-panel'
 import { WorkingFileDiff } from './working-file-diff'
+import { TerminalPanel } from '../terminal-panel/terminal-panel'
+import { getNumber, setNumber } from '../../lib/local-storage'
 
 const MinDetailsWidth = 240
 const MaxDetailsWidth = 700
@@ -79,6 +81,16 @@ interface IHistoryGraphViewProps {
   readonly hideWhitespaceInChangesDiff: boolean
   readonly showDiffCheckMarks: boolean
   readonly askForConfirmationOnDiscardChanges: boolean
+  readonly showTerminal: boolean
+  readonly onShowTerminalChanged: (show: boolean) => void
+  /** Show the working directory diff of a file, e.g. picked in the explorer */
+  readonly openWipFileRequest: IOpenWipFileRequest | null
+}
+
+export interface IOpenWipFileRequest {
+  readonly path: string
+  /** Distinguishes repeated requests for the same file */
+  readonly id: number
 }
 
 interface IHistoryGraphViewState {
@@ -92,7 +104,10 @@ interface IHistoryGraphViewState {
   /** The working directory file whose diff is open in place of the graph */
   readonly wipFile: IWipFileSelection | null
   readonly wipDiff: IDiff | null
+  readonly terminalHeight: number
 }
+
+const terminalHeightKey = 'terminal-panel-height'
 
 /**
  * The GitKraken-style History view: the commit graph in the center (or the
@@ -107,6 +122,8 @@ export class HistoryGraphView extends React.Component<
   private wipDiffFor: WorkingDirectoryFileChange | null = null
   private wipDiffStaged = false
   private wipDiffRequest = 0
+  /** A file to open once the WIP row is selected */
+  private pendingWipPath: string | null = null
 
   private getStashMap = memoizeOne(
     (stashes: ReadonlyArray<IGraphStash>) =>
@@ -167,6 +184,8 @@ export class HistoryGraphView extends React.Component<
       mergeToolPath: this.state?.mergeToolPath ?? null,
       wipFile: this.state?.wipFile ?? null,
       wipDiff: this.state?.wipDiff ?? null,
+      terminalHeight:
+        this.state?.terminalHeight ?? getNumber(terminalHeightKey, 240),
       settings: graphViewStore.getSettings(id),
       searchText: graphViewStore.getSearchText(id),
       detailsWidth: graphViewStore.columns.detailsWidth,
@@ -219,8 +238,32 @@ export class HistoryGraphView extends React.Component<
     ) {
       this.wipDiffFor = null
     }
+    const request = this.props.openWipFileRequest
+    if (request !== null && request !== prevProps.openWipFileRequest) {
+      this.pendingWipPath = request.path
+      if (!this.isWipSelected) {
+        this.props.dispatcher.changeRepositorySection(
+          this.props.repository,
+          RepositorySectionTab.Changes
+        )
+      }
+    }
+    this.openPendingWipFile()
     this.syncWipFile()
     this.refreshTracking()
+  }
+
+  private openPendingWipFile() {
+    const path = this.pendingWipPath
+    if (path === null || !this.isWipSelected) {
+      return
+    }
+    this.pendingWipPath = null
+    const { files } = this.props.state.changesState.workingDirectory
+    const file = files.find(f => f.path === path)
+    if (file !== undefined) {
+      this.onWipFileSelected({ path, staged: !hasUnstagedChanges(file) })
+    }
   }
 
   /** Whether the WIP row is selected and the staging panel is showing. */
@@ -549,6 +592,8 @@ export class HistoryGraphView extends React.Component<
         canPopStash={state.graphStashes.length > 0}
         onStash={this.onStashClick}
         onPopStash={this.onPopStashClick}
+        isTerminalVisible={this.props.showTerminal}
+        onToggleTerminal={this.onToggleTerminal}
         loadedCount={state.compareState.commitSHAs.length}
         searchText={this.state.searchText}
         onSearchTextChanged={this.onSearchTextChanged}
@@ -763,13 +808,41 @@ export class HistoryGraphView extends React.Component<
     )
   }
 
+  private onTerminalHeightChanged = (terminalHeight: number) => {
+    this.setState({ terminalHeight })
+    setNumber(terminalHeightKey, terminalHeight)
+  }
+
+  private onToggleTerminal = () => {
+    this.props.onShowTerminalChanged(!this.props.showTerminal)
+  }
+
+  private onCloseTerminal = () => {
+    this.props.onShowTerminalChanged(false)
+  }
+
+  private renderTerminal() {
+    if (!this.props.showTerminal) {
+      return null
+    }
+    return (
+      <TerminalPanel
+        path={this.props.repository.path}
+        height={this.state.terminalHeight}
+        onHeightChanged={this.onTerminalHeightChanged}
+        onClose={this.onCloseTerminal}
+      />
+    )
+  }
+
   public render() {
     return (
       <div id="history-graph-view" className="gk-theme">
         <div className="history-graph-center">
           {this.renderRemoteForm()}
           {this.renderConflictBar()}
-          {this.renderCenter()}
+          <div className="history-graph-main">{this.renderCenter()}</div>
+          {this.renderTerminal()}
         </div>
         {this.renderDetails()}
       </div>

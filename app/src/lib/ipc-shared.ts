@@ -25,6 +25,11 @@ import { CLIAction } from './cli-action'
  * the two over the untyped IPC framework.
  */
 export type RequestChannels = {
+  'pty-write': (id: number, data: string) => void
+  'pty-resize': (id: number, cols: number, rows: number) => void
+  'pty-kill': (id: number) => void
+  'pty-data': (id: number, data: string) => void
+  'pty-exit': (id: number, exitCode: number) => void
   'select-all-window-contents': () => void
   'dialog-did-open': () => void
   'update-menu-state': (
@@ -104,6 +109,8 @@ export type RequestChannels = {
  * Return signatures must be promises
  */
 export type RequestResponseChannels = {
+  /** Start an interactive shell in `cwd` and resolve with its session id */
+  'pty-spawn': (cwd: string, cols: number, rows: number) => Promise<number>
   'get-path': (path: PathType) => Promise<string>
   'get-app-architecture': () => Promise<Architecture>
   'get-app-path': () => Promise<string>

@@ -53,6 +53,7 @@ import {
 } from './dist-info'
 
 import {
+  chmodSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -349,6 +350,18 @@ function copyDependencies() {
 
   console.log('  Installing dependencies via yarn…')
   cp.execSync('yarn install', { cwd: outRoot, env: process.env })
+
+  // Yarn drops the executable bit of node-pty's prebuilt helper, without
+  // which no shell can be spawned on macOS and Linux.
+  const ptyPrebuilds = path.resolve(outRoot, 'node_modules/node-pty/prebuilds')
+  if (process.platform !== 'win32' && existsSync(ptyPrebuilds)) {
+    for (const dir of readdirSync(ptyPrebuilds)) {
+      const helper = path.join(ptyPrebuilds, dir, 'spawn-helper')
+      if (existsSync(helper)) {
+        chmodSync(helper, 0o755)
+      }
+    }
+  }
 
   console.log('  Copying desktop-askpass-trampoline…')
   const trampolineSource = path.resolve(

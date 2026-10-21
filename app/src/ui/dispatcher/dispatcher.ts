@@ -4255,6 +4255,10 @@ export class Dispatcher {
     return this.appStore._setClassicRepositoryLayout(classic)
   }
 
+  public setShowTerminalPanel(show: boolean) {
+    return this.appStore._setShowTerminalPanel(show)
+  }
+
   /** Set whether the worktree list is shown even without linked worktrees. */
   public setAlwaysShowWorktreeList(alwaysShowWorktreeList: boolean) {
     return this.appStore._setAlwaysShowWorktreeList(alwaysShowWorktreeList)

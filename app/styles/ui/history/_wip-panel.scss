@@ -54,12 +54,33 @@
   }
 }
 
-#history-graph-view .working-file-diff .center-diff-header {
-  > .header {
+// Diff headers are only styled inside .diff-container by default.
+#history-graph-view .center-diff-header > .header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+
+  .path-label-component {
     flex: 1 1 auto;
     min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    color: var(--gk-text-bright);
   }
 
+  .diff-options-component {
+    flex-shrink: 0;
+  }
+
+  .octicon.status {
+    flex-shrink: 0;
+  }
+}
+
+#history-graph-view .working-file-diff .center-diff-header {
   .wip-button {
     flex-shrink: 0;
     border: 1px solid var(--gk-border);

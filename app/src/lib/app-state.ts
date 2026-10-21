@@ -408,6 +408,9 @@ export interface IAppState {
    */
   readonly classicRepositoryLayout: boolean
 
+  /** Whether the integrated terminal is shown below the graph */
+  readonly showTerminalPanel: boolean
+
   /** Whether the user prefers absolute dates over relative time in lists */
   readonly preferAbsoluteDates: boolean
 

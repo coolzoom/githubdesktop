@@ -52,6 +52,7 @@ import {
   showNotification,
 } from 'desktop-notifications'
 import { initializeDesktopNotifications } from './notifications'
+import { registerPtyHost, killAllPtySessions } from './pty-host'
 import parseCommandLineArgs from 'minimist'
 import { CLIAction } from '../lib/cli-action'
 
@@ -520,6 +521,9 @@ app.on('ready', () => {
    * without clicking on any item or the item click was handled by the main
    * process as opposed to the renderer.
    */
+  registerPtyHost()
+  app.on('will-quit', killAllPtySessions)
+
   ipcMain.handle('show-contextual-menu', (event, items, addSpellCheckMenu) => {
     return new Promise(async resolve => {
       const window = BrowserWindow.fromWebContents(event.sender) || undefined

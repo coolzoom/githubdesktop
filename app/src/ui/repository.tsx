@@ -1,4 +1,6 @@
 import * as React from 'react'
+import * as Path from 'path'
+import classNames from 'classnames'
 import { GraphCommitOrder } from '../lib/git/graph'
 import { Repository } from '../models/repository'
 import { CommitOneLine } from '../models/commit'
@@ -11,10 +13,17 @@ import { FilesChangedBadge } from './changes/files-changed-badge'
 import { RefPanel, RefPanelSection } from './history-graph/ref-panel'
 import {
   HistoryGraphView,
+  IOpenWipFileRequest,
   primaryRef,
 } from './history-graph/history-graph-view'
 import { GraphMenus, IGraphMenuContext } from './history-graph/graph-menus'
 import { IWipCommitOptions } from './history-graph/wip-panel'
+import { FileExplorer } from './file-explorer/file-explorer'
+import { runInTerminal } from './terminal-panel/terminal-sessions'
+import { TooltippedContent } from './lib/tooltipped-content'
+import { TooltipDirection } from './lib/tooltip'
+import { Octicon } from './octicons'
+import * as octicons from './octicons/octicons.generated'
 import { IGraphRef, IGraphRefGroup } from './history-graph/graph-model'
 import { graphViewStore } from './history-graph/graph-view-store'
 import { IRemote } from '../models/remote'
@@ -62,6 +71,7 @@ interface IRepositoryViewProps {
   readonly graphCommitOrder: GraphCommitOrder
   /** Use the separate Changes and History tabs instead of the single graph */
   readonly classicRepositoryLayout: boolean
+  readonly showTerminalPanel: boolean
   readonly showDiffCheckMarks: boolean
   readonly askForConfirmationOnDiscardChanges: boolean
   readonly askForConfirmationOnCommitFilteredChanges: boolean
@@ -153,6 +163,18 @@ interface IRepositoryViewProps {
 
 interface IRepositoryViewState {
   readonly changesListScrollTop: number
+  readonly sidebarView: SidebarView
+  /** A changed file the explorer asked the graph view to show the diff of */
+  readonly openWipFileRequest: IOpenWipFileRequest | null
+}
+
+type SidebarView = 'explorer' | 'branches'
+
+const sidebarViewKey = 'repository-sidebar-view'
+
+/** Single quote a path for a POSIX shell or wrap it in double quotes. */
+function quoteForShell(path: string) {
+  return __WIN32__ ? `"${path}"` : `'${path.replace(/'/g, `'\\''`)}'`
 }
 
 const enum Tab {
@@ -193,6 +215,11 @@ export class RepositoryView extends React.Component<
 
     this.state = {
       changesListScrollTop: 0,
+      sidebarView:
+        localStorage.getItem(sidebarViewKey) === 'explorer'
+          ? 'explorer'
+          : 'branches',
+      openWipFileRequest: null,
     }
   }
 
@@ -405,7 +432,7 @@ export class RepositoryView extends React.Component<
     const selectedSection = this.props.state.selectedSection
 
     if (!this.props.classicRepositoryLayout) {
-      return this.renderRefPanel()
+      return this.renderUnifiedSidebar()
     } else if (selectedSection === RepositorySectionTab.Changes) {
       return this.renderChangesSidebar()
     } else if (selectedSection === RepositorySectionTab.History) {
@@ -413,6 +440,99 @@ export class RepositoryView extends React.Component<
     } else {
       return assertNever(selectedSection, 'Unknown repository section')
     }
+  }
+
+  private setSidebarView(sidebarView: SidebarView) {
+    localStorage.setItem(sidebarViewKey, sidebarView)
+    this.setState({ sidebarView })
+  }
+
+  private onShowExplorer = () => this.setSidebarView('explorer')
+
+  private onShowBranches = () => this.setSidebarView('branches')
+
+  private onOpenChangedFile = (path: string) =>
+    this.setState(state => ({
+      openWipFileRequest: {
+        path,
+        id: (state.openWipFileRequest?.id ?? 0) + 1,
+      },
+    }))
+
+  private onShowTerminalChanged = (show: boolean) =>
+    this.props.dispatcher.setShowTerminalPanel(show)
+
+  private onOpenInTerminal = (path: string) => {
+    const { repository } = this.props
+    this.props.dispatcher.setShowTerminalPanel(true)
+    runInTerminal(
+      repository.path,
+      `cd ${quoteForShell(Path.join(repository.path, path))}`
+    )
+  }
+
+  private renderActivityButton(
+    view: SidebarView,
+    label: string,
+    symbol: typeof octicons.repo,
+    onClick: () => void
+  ) {
+    const isActive = this.state.sidebarView === view
+    return (
+      <TooltippedContent
+        tagName="span"
+        tooltip={label}
+        direction={TooltipDirection.EAST}
+      >
+        <button
+          type="button"
+          className={classNames('activity-button', { active: isActive })}
+          aria-label={label}
+          aria-pressed={isActive}
+          onClick={onClick}
+        >
+          <Octicon symbol={symbol} />
+        </button>
+      </TooltippedContent>
+    )
+  }
+
+  /** VS Code's activity bar switching between the Explorer and the refs. */
+  private renderUnifiedSidebar() {
+    const { repository, state } = this.props
+    return (
+      <div className="unified-sidebar">
+        <div className="activity-bar" role="toolbar" aria-label="Views">
+          {this.renderActivityButton(
+            'explorer',
+            'Explorer',
+            octicons.file,
+            this.onShowExplorer
+          )}
+          {this.renderActivityButton(
+            'branches',
+            'Branches, Tags and Stashes',
+            octicons.gitBranch,
+            this.onShowBranches
+          )}
+        </div>
+        <div className="unified-sidebar-view">
+          {this.state.sidebarView === 'explorer' ? (
+            <FileExplorer
+              repository={repository}
+              dispatcher={this.props.dispatcher}
+              files={state.changesState.workingDirectory.files}
+              externalEditorLabel={this.props.externalEditorLabel}
+              onOpenInExternalEditor={this.props.onOpenInExternalEditor}
+              onOpenChangedFile={this.onOpenChangedFile}
+              onOpenInTerminal={this.onOpenInTerminal}
+            />
+          ) : (
+            this.renderRefPanel()
+          )}
+        </div>
+      </div>
+    )
   }
 
   private handleSidebarWidthReset = () => {
@@ -521,6 +641,9 @@ export class RepositoryView extends React.Component<
         askForConfirmationOnDiscardChanges={
           this.props.askForConfirmationOnDiscardChanges
         }
+        showTerminal={this.props.showTerminalPanel}
+        onShowTerminalChanged={this.onShowTerminalChanged}
+        openWipFileRequest={this.state.openWipFileRequest}
       />
     )
   }

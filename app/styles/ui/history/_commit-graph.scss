@@ -363,11 +363,10 @@ $graph-colors: #15a0bf, #0669f7, #8e00c2, #c517b6, #d90171, #cd0101, #f25d2e, #f
     }
 
     .graph-header-actions {
-      position: absolute;
-      right: 30px;
-      top: 4px;
       display: flex;
       gap: 4px;
+      margin-left: auto;
+      padding-left: 8px;
 
       button {
         display: flex;

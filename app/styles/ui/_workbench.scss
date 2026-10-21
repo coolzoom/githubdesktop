@@ -1,0 +1,328 @@
+// VS Code's activity bar and Explorer in the repository sidebar, and the
+// integrated terminal below the graph.
+
+.unified-sidebar {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+
+  .activity-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    flex-shrink: 0;
+    width: 40px;
+    padding-top: 4px;
+    background: var(--box-alt-background-color);
+    border-right: 1px solid var(--box-border-color);
+  }
+
+  .activity-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: none;
+    border-left: 2px solid transparent;
+    background: transparent;
+    color: var(--text-secondary-color);
+    cursor: pointer;
+
+    .octicon {
+      width: 20px;
+      height: 20px;
+    }
+
+    &:hover {
+      color: var(--text-color);
+    }
+
+    &.active {
+      color: var(--text-color);
+      border-left-color: var(--tab-bar-active-color);
+    }
+  }
+
+  .unified-sidebar-view {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+  }
+}
+
+.file-explorer {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  font-size: 12px;
+  user-select: none;
+
+  .file-explorer-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 30px;
+    padding: 0 6px 0 12px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--box-border-color);
+  }
+
+  .file-explorer-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary-color);
+  }
+
+  .file-explorer-actions {
+    display: flex;
+    gap: 2px;
+    visibility: hidden;
+
+    button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text-secondary-color);
+      cursor: pointer;
+
+      &:hover {
+        background: var(--box-hover-background-color);
+        color: var(--text-color);
+      }
+    }
+  }
+
+  &:hover .file-explorer-actions,
+  &:focus-within .file-explorer-actions {
+    visibility: visible;
+  }
+
+  .file-explorer-tree {
+    flex: 1 1 auto;
+    min-height: 0;
+    outline: none;
+  }
+
+  .explorer-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 22px;
+    padding-right: 8px;
+    white-space: nowrap;
+    color: var(--text-color);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--box-hover-background-color);
+    }
+
+    &.selected {
+      background: var(--box-selected-background-color);
+    }
+
+    &.ignored {
+      opacity: 0.5;
+    }
+
+    &.added {
+      color: var(--color-new);
+    }
+    &.modified {
+      color: var(--color-modified);
+    }
+    &.deleted {
+      color: var(--color-deleted);
+    }
+    &.renamed {
+      color: var(--color-renamed);
+    }
+    &.conflicted {
+      color: var(--color-conflicted);
+    }
+
+    &.editing {
+      cursor: default;
+    }
+  }
+
+  .file-explorer-tree:focus-within .explorer-row.selected {
+    background: var(--box-selected-active-background-color);
+    color: var(--box-selected-active-text-color);
+  }
+
+  .explorer-twistie {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    flex-shrink: 0;
+    color: var(--text-secondary-color);
+
+    .octicon {
+      width: 12px;
+      height: 12px;
+    }
+  }
+
+  .explorer-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    color: var(--text-secondary-color);
+  }
+
+  .folder .explorer-icon {
+    color: var(--link-button-color);
+  }
+
+  .explorer-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .explorer-decoration {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .folder .explorer-decoration {
+    font-size: 8px;
+  }
+
+  .explorer-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 18px;
+    padding: 0 4px;
+    border: 1px solid var(--focus-color);
+    border-radius: 2px;
+    background: var(--background-color);
+    color: var(--text-color);
+    font: inherit;
+    outline: none;
+  }
+}
+
+#history-graph-view {
+  .history-graph-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .graph-header-actions button.active {
+    color: var(--gk-text-bright);
+    background: var(--gk-panel-bg2);
+    border-color: var(--gk-blue);
+  }
+}
+
+.terminal-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 80px;
+  border-top: 1px solid var(--box-border-color);
+  background: var(--background-color);
+
+  .terminal-panel-resize-handle {
+    position: absolute;
+    top: -3px;
+    left: 0;
+    right: 0;
+    height: 6px;
+    cursor: ns-resize;
+    z-index: 1;
+
+    &:hover {
+      background: var(--focus-color);
+      opacity: 0.6;
+    }
+  }
+
+  .terminal-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 28px;
+    padding: 0 6px 0 12px;
+    flex-shrink: 0;
+    font-size: 11px;
+  }
+
+  .terminal-panel-title {
+    padding-bottom: 2px;
+    border-bottom: 1px solid var(--tab-bar-active-color);
+    color: var(--text-color);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .terminal-panel-cwd {
+    flex: 1 1 auto;
+    color: var(--text-secondary-color);
+  }
+
+  .terminal-panel-actions {
+    display: flex;
+    gap: 2px;
+
+    button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text-secondary-color);
+      cursor: pointer;
+
+      &:hover {
+        background: var(--box-hover-background-color);
+        color: var(--text-color);
+      }
+    }
+  }
+
+  .terminal-panel-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0 0 4px 12px;
+    overflow: hidden;
+  }
+
+  .terminal-session {
+    width: 100%;
+    height: 100%;
+  }
+}

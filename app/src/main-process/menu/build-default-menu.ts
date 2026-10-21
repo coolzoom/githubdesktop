@@ -213,6 +213,12 @@ export function buildDefaultMenuTemplate({
         click: emit('show-worktrees'),
         visible: enableWorktreeSupport(),
       },
+      {
+        label: __DARWIN__ ? 'Toggle Terminal' : 'Toggle &Terminal',
+        id: 'toggle-terminal',
+        accelerator: 'Ctrl+`',
+        click: emit('toggle-terminal'),
+      },
       separator,
       {
         label: __DARWIN__ ? 'Go to Summary' : 'Go to &Summary',
