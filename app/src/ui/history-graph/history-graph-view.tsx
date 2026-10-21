@@ -36,6 +36,8 @@ import {
 } from './graph-view-store'
 import { GraphMenus } from './graph-menus'
 import { RemoteForm } from './remote-form'
+import { ConflictBar, getConflictInfo } from './conflict-bar'
+import { MergeConflictEditor } from '../merge-conflict-editor/merge-conflict-editor'
 
 const MinDetailsWidth = 240
 const MaxDetailsWidth = 700
@@ -68,6 +70,8 @@ interface IHistoryGraphViewState {
   readonly searchText: string
   readonly detailsWidth: number
   readonly remoteForm: IRemoteFormRequest | null
+  /** The conflicted file open in the merge tool in place of the graph */
+  readonly mergeToolPath: string | null
 }
 
 /**
@@ -119,6 +123,8 @@ export class HistoryGraphView extends React.Component<
       })
   )
 
+  private getConflictInfo = memoizeOne(getConflictInfo)
+
   public constructor(props: IHistoryGraphViewProps) {
     super(props)
     this.state = this.storeState()
@@ -128,6 +134,7 @@ export class HistoryGraphView extends React.Component<
     const { id } = this.props.repository
     return {
       isDiffOpen: this.state?.isDiffOpen ?? false,
+      mergeToolPath: this.state?.mergeToolPath ?? null,
       settings: graphViewStore.getSettings(id),
       searchText: graphViewStore.getSearchText(id),
       detailsWidth: graphViewStore.columns.detailsWidth,
@@ -165,7 +172,11 @@ export class HistoryGraphView extends React.Component<
       this.setState({ isDiffOpen: false })
     }
     if (prevProps.repository.id !== this.props.repository.id) {
-      this.setState({ ...this.storeState(), isDiffOpen: false })
+      this.setState({
+        ...this.storeState(),
+        isDiffOpen: false,
+        mergeToolPath: null,
+      })
       this.initializeHistory()
     }
     this.refreshTracking()
@@ -441,6 +452,80 @@ export class HistoryGraphView extends React.Component<
     )
   }
 
+  private get conflictInfo() {
+    const { changesState, multiCommitOperationState } = this.props.state
+    return this.getConflictInfo(
+      changesState.conflictState,
+      multiCommitOperationState,
+      changesState.workingDirectory
+    )
+  }
+
+  private onOpenConflictFile = (path: string) => {
+    const file = this.conflictInfo?.files.find(f => f.path === path)
+    if (file === undefined) {
+      return
+    }
+    if (!file.canMerge) {
+      this.onShowConflictsDialog()
+      return
+    }
+    this.setState({ mergeToolPath: path, isDiffOpen: false })
+  }
+
+  private onCloseMergeTool = () => {
+    this.setState({ mergeToolPath: null })
+  }
+
+  private onShowConflictsDialog = () => {
+    const { dispatcher, repository } = this.props
+    if (!dispatcher.showConflictsDialog(repository)) {
+      dispatcher.changeRepositorySection(
+        repository,
+        RepositorySectionTab.Changes
+      )
+    }
+  }
+
+  private renderConflictBar() {
+    const info = this.conflictInfo
+    if (info === null) {
+      return null
+    }
+    return (
+      <ConflictBar
+        info={info}
+        openPath={this.state.mergeToolPath}
+        onOpenFile={this.onOpenConflictFile}
+        onShowDialog={this.onShowConflictsDialog}
+      />
+    )
+  }
+
+  private renderMergeTool(path: string) {
+    const info = this.conflictInfo
+    return (
+      <MergeConflictEditor
+        repository={this.props.repository}
+        dispatcher={this.props.dispatcher}
+        path={path}
+        ourBranch={info?.ourBranch}
+        theirBranch={info?.theirBranch}
+        onClose={this.onCloseMergeTool}
+      />
+    )
+  }
+
+  private renderCenter() {
+    const { mergeToolPath } = this.state
+    if (mergeToolPath !== null && this.conflictInfo !== null) {
+      return this.renderMergeTool(mergeToolPath)
+    }
+    const showDiff =
+      this.state.isDiffOpen && this.props.state.commitSelection.file !== null
+    return showDiff ? this.renderDiff() : this.renderGraph()
+  }
+
   private onCloseRemoteForm = () => {
     graphViewStore.closeRemoteForm(this.props.repository.id)
   }
@@ -463,13 +548,12 @@ export class HistoryGraphView extends React.Component<
   }
 
   public render() {
-    const showDiff =
-      this.state.isDiffOpen && this.props.state.commitSelection.file !== null
     return (
       <div id="history-graph-view" className="gk-theme">
         <div className="history-graph-center">
           {this.renderRemoteForm()}
-          {showDiff ? this.renderDiff() : this.renderGraph()}
+          {this.renderConflictBar()}
+          {this.renderCenter()}
         </div>
         {this.renderDetails()}
       </div>

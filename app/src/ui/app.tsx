@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { MergeConflictEditorDialog } from './merge-conflict-editor/merge-conflict-editor-dialog'
 import * as Path from 'path'
 
 import { TransitionGroup, CSSTransition } from 'react-transition-group'
@@ -3039,6 +3040,18 @@ export class App extends React.Component<IAppProps, IAppState> {
           />
         )
       }
+      case PopupType.MergeConflictEditor:
+        return (
+          <MergeConflictEditorDialog
+            key="merge-conflict-editor"
+            repository={popup.repository}
+            dispatcher={this.props.dispatcher}
+            path={popup.path}
+            ourBranch={popup.ourBranch}
+            theirBranch={popup.theirBranch}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
       default:
         return assertNever(popup, `Unknown popup type: ${popup}`)
     }

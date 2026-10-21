@@ -29,6 +29,7 @@ import {
 } from '../../../lib/status'
 import { revealInFileManager } from '../../../lib/app-shell'
 import { DialogPreferredFocusClassName } from '../../dialog'
+import { PopupType } from '../../../models/popup'
 
 const defaultConflictsResolvedMessage = 'No conflicts remaining'
 
@@ -298,9 +299,17 @@ const renderConflictedFileWithConflictMarkers: React.FunctionComponent<{
     props.theirBranch
   )
 
-  const openEditorButtonClassName = props.isFirstConflictedFile
-    ? `small-button button-group-item ${DialogPreferredFocusClassName}`
-    : 'small-button button-group-item'
+  const mergeToolButtonClassName = props.isFirstConflictedFile
+    ? `small-button merge-tool-button ${DialogPreferredFocusClassName}`
+    : 'small-button merge-tool-button'
+  const openEditorButtonClassName = 'small-button button-group-item'
+  const onMergeToolClick = makeMergeToolClickHandler(
+    props.dispatcher,
+    props.repository,
+    props.path,
+    props.ourBranch,
+    props.theirBranch
+  )
 
   const content = (
     <>
@@ -309,6 +318,13 @@ const renderConflictedFileWithConflictMarkers: React.FunctionComponent<{
         <div className="file-conflicts-status">{message}</div>
       </div>
       <div className="action-buttons">
+        <Button
+          onClick={onMergeToolClick}
+          className={mergeToolButtonClassName}
+          tooltip="Resolve this file in the built-in merge tool"
+        >
+          <Octicon symbol={octicons.gitMerge} /> Merge tool
+        </Button>
         <Button
           onClick={props.onOpenEditorClick}
           disabled={disabled}
@@ -331,6 +347,35 @@ const renderConflictedFileWithConflictMarkers: React.FunctionComponent<{
     </>
   )
   return renderConflictedFileWrapper(props.path, content)
+}
+
+/** makes a click handling function that opens the merge tool for a file */
+const makeMergeToolClickHandler = (
+  dispatcher: Dispatcher,
+  repository: Repository,
+  path: string,
+  ourBranch?: string,
+  theirBranch?: string
+) => {
+  return () =>
+    openMergeTool(dispatcher, repository, path, ourBranch, theirBranch)
+}
+
+/** Opens the built-in merge conflict editor for a file */
+export function openMergeTool(
+  dispatcher: Dispatcher,
+  repository: Repository,
+  path: string,
+  ourBranch?: string,
+  theirBranch?: string
+) {
+  dispatcher.showPopup({
+    type: PopupType.MergeConflictEditor,
+    repository,
+    path,
+    ourBranch,
+    theirBranch,
+  })
 }
 
 /** makes a click handling function for manual conflict resolution options */
@@ -408,6 +453,17 @@ const makeMarkerConflictDropdownClickHandler = (
   return () => {
     const absoluteFilePath = join(repository.path, relativeFilePath)
     const items: IMenuItem[] = [
+      {
+        label: __DARWIN__ ? 'Open in Merge Tool' : 'Open in merge tool',
+        action: () =>
+          openMergeTool(
+            dispatcher,
+            repository,
+            relativeFilePath,
+            ourBranch,
+            theirBranch
+          ),
+      },
       {
         label: OpenWithDefaultProgramLabel,
         action: () => openFile(absoluteFilePath, dispatcher),

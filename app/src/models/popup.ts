@@ -30,6 +30,7 @@ import type { IBYOKModel, IBYOKProvider } from '../lib/copilot/byok'
 import { IDeleteWorktreeOptions, WorktreeEntry } from './worktree'
 
 export enum PopupType {
+  MergeConflictEditor = 'MergeConflictEditor',
   RenameBranch = 'RenameBranch',
   DeleteBranch = 'DeleteBranch',
   DeleteRemoteBranch = 'DeleteRemoteBranch',
@@ -134,6 +135,13 @@ interface IBasePopup {
 }
 
 export type PopupDetail =
+  | {
+      type: PopupType.MergeConflictEditor
+      repository: Repository
+      path: string
+      ourBranch?: string
+      theirBranch?: string
+    }
   | { type: PopupType.RenameBranch; repository: Repository; branch: Branch }
   | {
       type: PopupType.DeleteBranch

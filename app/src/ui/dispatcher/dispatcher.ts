@@ -4033,6 +4033,30 @@ export class Dispatcher {
     })
   }
 
+  /** Reopen the conflicts dialog of the merge, rebase or cherry-pick in progress. */
+  public showConflictsDialog(repository: Repository) {
+    const { changesState, multiCommitOperationState } =
+      this.repositoryStateManager.get(repository)
+    const step = multiCommitOperationState?.step
+    if (
+      changesState.conflictState === null ||
+      step === undefined ||
+      (step.kind !== MultiCommitOperationStepKind.ShowConflicts &&
+        step.kind !== MultiCommitOperationStepKind.HideConflicts)
+    ) {
+      return false
+    }
+    this.setMultiCommitOperationStep(repository, {
+      kind: MultiCommitOperationStepKind.ShowConflicts,
+      conflictState: {
+        ...step.conflictState,
+        manualResolutions: changesState.conflictState.manualResolutions,
+      },
+    })
+    this.showPopup({ type: PopupType.MultiCommitOperation, repository })
+    return true
+  }
+
   public startMergeBranchOperation(
     repository: Repository,
     isSquash: boolean = false,
