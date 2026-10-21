@@ -269,14 +269,82 @@ $graph-colors: #15a0bf, #0669f7, #8e00c2, #c517b6, #d90171, #cd0101, #f25d2e, #f
   font-size: 12px;
   user-select: none;
 
-  .graph-search {
+  .graph-toolbar {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 8px;
+    height: 30px;
+    padding: 0 8px;
+    flex-shrink: 0;
     background: var(--gk-panel-bg);
     border-bottom: 1px solid var(--gk-border);
 
+    .graph-header-actions {
+      display: flex;
+      gap: 4px;
+      margin-left: auto;
+      flex-shrink: 0;
+
+      button {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        height: 22px;
+        padding: 0 8px;
+        border: 1px solid var(--gk-border);
+        border-radius: 11px;
+        background: var(--gk-panel-bg1);
+        color: var(--gk-text-secondary);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        cursor: pointer;
+
+        .octicon {
+          width: 12px;
+          height: 12px;
+        }
+
+        &:hover:not(:disabled) {
+          color: var(--gk-text-bright);
+          background: var(--gk-panel-bg2);
+        }
+
+        &:disabled {
+          opacity: 0.4;
+          cursor: default;
+        }
+      }
+    }
+
+    .graph-search-button {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 22px;
+      min-width: 0;
+      flex: 0 1 260px;
+      padding: 0 8px;
+      border: 1px solid var(--gk-border);
+      border-radius: 4px;
+      background: var(--gk-app-bg);
+      color: var(--gk-text-disabled);
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      cursor: text;
+
+      kbd {
+        margin-left: auto;
+        font-family: inherit;
+        font-size: 10px;
+        color: var(--gk-text-disabled);
+      }
+    }
+  }
+
+  .graph-search {
     input {
       flex: 1 1 auto;
     }
@@ -359,45 +427,6 @@ $graph-colors: #15a0bf, #0669f7, #8e00c2, #c517b6, #d90171, #cd0101, #f25d2e, #f
 
       &:hover {
         color: var(--gk-text-bright);
-      }
-    }
-
-    .graph-header-actions {
-      display: flex;
-      gap: 4px;
-      margin-left: auto;
-      padding-left: 8px;
-
-      button {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        height: 18px;
-        padding: 0 6px;
-        border: 1px solid var(--gk-border);
-        border-radius: 9px;
-        background: var(--gk-panel-bg1);
-        color: var(--gk-text-secondary);
-        font-size: 10px;
-        font-weight: 600;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        cursor: pointer;
-
-        .octicon {
-          width: 10px;
-          height: 10px;
-        }
-
-        &:hover:not(:disabled) {
-          color: var(--gk-text-bright);
-          background: var(--gk-panel-bg2);
-        }
-
-        &:disabled {
-          opacity: 0.4;
-          cursor: default;
-        }
       }
     }
   }

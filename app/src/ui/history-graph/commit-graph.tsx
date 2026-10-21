@@ -278,10 +278,7 @@ export class CommitGraph extends React.Component<
     const mod = __DARWIN__ ? event.metaKey : event.ctrlKey
     if (mod && !event.shiftKey && !event.altKey && event.key === 'f') {
       event.preventDefault()
-      this.setState({ showSearch: true }, () => {
-        this.searchInput?.focus()
-        this.searchInput?.select()
-      })
+      this.openSearch()
     }
   }
 
@@ -457,51 +454,7 @@ export class CommitGraph extends React.Component<
           GRAPH
           {this.renderHandle('graphWidth')}
         </div>
-        <div className="zone message-zone">
-          COMMIT MESSAGE
-          <div className="graph-header-actions">
-            <TooltippedContent tagName="span" tooltip="Stash all changes">
-              <button
-                type="button"
-                disabled={this.props.workDirChangeCount === 0}
-                onClick={this.props.onStash}
-                aria-label="Stash all changes"
-              >
-                <Octicon symbol={octicons.archive} />
-              </button>
-            </TooltippedContent>
-            <TooltippedContent
-              tagName="span"
-              tooltip="Pop the latest stash (its changes come back unstaged)"
-            >
-              <button
-                type="button"
-                disabled={!this.props.canPopStash}
-                onClick={this.props.onPopStash}
-                aria-label="Pop the latest stash"
-              >
-                <Octicon symbol={octicons.unfold} />
-              </button>
-            </TooltippedContent>
-            <TooltippedContent
-              tagName="span"
-              tooltip={`${
-                this.props.isTerminalVisible ? 'Hide' : 'Show'
-              } terminal (Ctrl+\`)`}
-            >
-              <button
-                type="button"
-                className={this.props.isTerminalVisible ? 'active' : undefined}
-                onClick={this.props.onToggleTerminal}
-                aria-label="Toggle terminal"
-                aria-pressed={this.props.isTerminalVisible}
-              >
-                <Octicon symbol={octicons.terminal} />
-              </button>
-            </TooltippedContent>
-            {this.renderCommitOrderButton()}
-          </div>
-        </div>
+        <div className="zone message-zone">COMMIT MESSAGE</div>
         {columns.showAuthor ? (
           <div
             className="zone author-zone"
@@ -930,13 +883,80 @@ export class CommitGraph extends React.Component<
     this.searchInput = input
   }
 
+  private openSearch = () => {
+    this.setState({ showSearch: true }, () => {
+      this.searchInput?.focus()
+      this.searchInput?.select()
+    })
+  }
+
+  private renderToolbarActions() {
+    return (
+      <div className="graph-header-actions">
+        <TooltippedContent tagName="span" tooltip="Stash all changes">
+          <button
+            type="button"
+            disabled={this.props.workDirChangeCount === 0}
+            onClick={this.props.onStash}
+            aria-label="Stash all changes"
+          >
+            <Octicon symbol={octicons.archive} />
+          </button>
+        </TooltippedContent>
+        <TooltippedContent
+          tagName="span"
+          tooltip="Pop the latest stash (its changes come back unstaged)"
+        >
+          <button
+            type="button"
+            disabled={!this.props.canPopStash}
+            onClick={this.props.onPopStash}
+            aria-label="Pop the latest stash"
+          >
+            <Octicon symbol={octicons.unfold} />
+          </button>
+        </TooltippedContent>
+        <TooltippedContent
+          tagName="span"
+          tooltip={`${
+            this.props.isTerminalVisible ? 'Hide' : 'Show'
+          } terminal (Ctrl+\`)`}
+        >
+          <button
+            type="button"
+            className={this.props.isTerminalVisible ? 'active' : undefined}
+            onClick={this.props.onToggleTerminal}
+            aria-label="Toggle terminal"
+            aria-pressed={this.props.isTerminalVisible}
+          >
+            <Octicon symbol={octicons.terminal} />
+          </button>
+        </TooltippedContent>
+        {this.renderCommitOrderButton()}
+      </div>
+    )
+  }
+
   private renderSearch() {
     if (!this.state.showSearch && this.props.searchText.length === 0) {
-      return null
+      return (
+        <div className="graph-toolbar">
+          <button
+            type="button"
+            className="graph-search-button"
+            onClick={this.openSearch}
+          >
+            <Octicon symbol={octicons.search} />
+            Search commits
+            <kbd>{__DARWIN__ ? '\u2318F' : 'Ctrl+F'}</kbd>
+          </button>
+          {this.renderToolbarActions()}
+        </div>
+      )
     }
     const count = this.props.graph.rows.length
     return (
-      <div className="graph-search">
+      <div className="graph-toolbar graph-search">
         <Octicon symbol={octicons.search} />
         <input
           ref={this.onSearchRef}
@@ -953,6 +973,7 @@ export class CommitGraph extends React.Component<
         <button onClick={this.closeSearch} aria-label="Close search">
           <Octicon symbol={octicons.x} />
         </button>
+        {this.renderToolbarActions()}
       </div>
     )
   }
