@@ -3,6 +3,7 @@ import { Account } from '../models/account'
 import { getAccountForEndpoint } from './api'
 import {
   enableCommitMessageGeneration,
+  enableCopilotAgent,
   enableCopilotConflictResolution,
   enableCopilotSdkCommitMessageGeneration,
 } from './feature-flag'
@@ -76,4 +77,17 @@ export function getAccountForCopilotConflictResolution(
   }
 
   return accounts.find(isAccountEligibleForCopilotConflictResolution)
+}
+
+/** The signed-in account to use for the in-app Copilot agent. */
+export function getAccountForCopilotAgent(
+  accounts: ReadonlyArray<Account>,
+  repository: Repository
+): Account | undefined {
+  const repositoryAccount = getAccountForRepository(accounts, repository)
+  if (repositoryAccount !== null && enableCopilotAgent(repositoryAccount)) {
+    return repositoryAccount
+  }
+
+  return accounts.find(enableCopilotAgent)
 }

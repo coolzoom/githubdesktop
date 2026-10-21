@@ -18,6 +18,8 @@ import {
   refreshMargin,
 } from '../credential-sessions'
 
+const CopilotInfoRetryDelay = 15 * 1000
+
 // Ensure that GitHub.com accounts appear first followed by Enterprise
 // accounts, sorted by the order in which they were added.
 const sortAccounts = (accounts: ReadonlyArray<Account>) =>
@@ -80,6 +82,7 @@ export class AccountsStore extends TypedBaseStore<ReadonlyArray<Account>> {
 
   private accounts: ReadonlyArray<Account> = []
   private readonly credentials: CredentialSessions
+  private readonly copilotInfoRetried = new Set<string>()
 
   /** A promise that will resolve when the accounts have been loaded. */
   private loadingPromise: Promise<void>
@@ -324,10 +327,27 @@ export class AccountsStore extends TypedBaseStore<ReadonlyArray<Account>> {
       if (token !== null) {
         this.accounts = this.accounts.map(a =>
           a.endpoint === account.endpoint
-            ? this.credentials.inheritSession(a, updated.withToken(token))
+            ? this.credentials.inheritSession(
+                a,
+                keepKnownCopilotInfo(updated, a).withToken(token)
+              )
             : a
         )
         this.save()
+      }
+      if (
+        updated.copilotLicenseType === undefined &&
+        !this.copilotInfoRetried.has(account.endpoint)
+      ) {
+        this.copilotInfoRetried.add(account.endpoint)
+        window.setTimeout(() => {
+          const current = this.accounts.find(
+            a => a.endpoint === account.endpoint
+          )
+          if (current !== undefined) {
+            this.tryUpdateAccount(current)
+          }
+        }, CopilotInfoRetryDelay)
       }
     } catch (e) {
       log.warn(`Error refreshing account '${account.login}'`, e)
@@ -468,6 +488,33 @@ export class AccountsStore extends TypedBaseStore<ReadonlyArray<Account>> {
 
     this.emitUpdate(this.accounts)
   }
+}
+
+/**
+ * `fetchUser` leaves the Copilot fields undefined when only the Copilot
+ * request fails, which would otherwise erase what we knew about the license.
+ */
+function keepKnownCopilotInfo(updated: Account, previous: Account): Account {
+  if (
+    updated.copilotLicenseType !== undefined ||
+    previous.copilotLicenseType === undefined
+  ) {
+    return updated
+  }
+  return new Account(
+    updated.login,
+    updated.endpoint,
+    updated.token,
+    updated.emails,
+    updated.avatarURL,
+    updated.id,
+    updated.name,
+    updated.plan,
+    previous.copilotEndpoint,
+    previous.isCopilotDesktopEnabled,
+    updated.features,
+    previous.copilotLicenseType
+  )
 }
 
 async function updatedAccount(account: Account): Promise<Account> {

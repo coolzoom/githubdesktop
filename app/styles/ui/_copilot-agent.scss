@@ -1,0 +1,203 @@
+.copilot-agent-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--background-color);
+}
+
+.copilot-agent-header {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 6px 0 12px;
+  border-bottom: 1px solid var(--box-border-color);
+
+  .copilot-agent-title {
+    flex: 1 1 auto;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-secondary-color);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+}
+
+.copilot-agent-icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-secondary-color);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: var(--text-color);
+    background: var(--box-selected-background-color);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+}
+
+.copilot-agent-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  padding: 24px 16px;
+  color: var(--text-secondary-color);
+  text-align: center;
+  font-size: var(--font-size-sm);
+
+  .octicon {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+.copilot-agent-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 12px;
+}
+
+.copilot-agent-bubble {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: var(--font-size-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+
+  &.user {
+    align-self: flex-end;
+    background: var(--box-selected-background-color);
+    color: var(--text-color);
+  }
+
+  &.assistant,
+  &.error {
+    background: var(--box-alt-background-color);
+    color: var(--text-color);
+  }
+
+  &.error {
+    color: var(--color-conflicted);
+  }
+}
+
+.copilot-agent-reasoning {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary-color);
+  font-style: italic;
+  white-space: pre-wrap;
+}
+
+.copilot-agent-tool {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary-color);
+
+  .octicon {
+    width: 12px;
+    height: 12px;
+  }
+
+  &.running .octicon {
+    animation: copilot-agent-spin 1s linear infinite;
+  }
+}
+
+@keyframes copilot-agent-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.copilot-agent-permission {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--box-border-color);
+  background: var(--box-alt-background-color);
+  font-size: var(--font-size-sm);
+
+  .octicon {
+    color: var(--color-conflicted);
+  }
+
+  .copilot-agent-permission-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  button {
+    height: 22px;
+    padding: 0 8px;
+    border: 1px solid var(--box-border-color);
+    border-radius: 4px;
+    background: var(--background-color);
+    color: var(--text-color);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+  }
+}
+
+.copilot-agent-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--box-border-color);
+
+  textarea {
+    resize: none;
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--box-border-color);
+    border-radius: 6px;
+    background: var(--background-color);
+    color: var(--text-color);
+    font-size: var(--font-size-sm);
+    font-family: inherit;
+  }
+
+  button {
+    align-self: flex-end;
+    height: 24px;
+    padding: 0 10px;
+    border: 1px solid var(--box-border-color);
+    border-radius: 4px;
+    background: var(--box-selected-background-color);
+    color: var(--text-color);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+  }
+}

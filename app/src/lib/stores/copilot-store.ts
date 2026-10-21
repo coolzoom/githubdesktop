@@ -52,6 +52,16 @@ import {
   CopilotConflictResolutionError,
   CopilotConflictResolutionFailureStage,
 } from '../copilot-conflict-resolution-error'
+import { CopilotAgentSession } from './copilot-agent-session'
+import { Repository } from '../../models/repository'
+
+/** Each chat keeps its own Copilot runtime process alive. */
+const MaxAgentChatsPerRepository = 8
+
+interface IAgentChats {
+  sessions: ReadonlyArray<CopilotAgentSession>
+  active: CopilotAgentSession | null
+}
 
 /** The default model ID used for Copilot commit message generation. */
 export const DefaultCopilotModel = 'auto'
@@ -831,6 +841,7 @@ export class CopilotStore extends BaseStore {
     Promise<CopilotQuotaSnapshots | null>
   >()
   private readonly signedInAccountKeys = new Set<string>()
+  private readonly agentSessions = new Map<string, IAgentChats>()
 
   public constructor(private readonly accountsStore: AccountsStore) {
     super()
@@ -903,7 +914,8 @@ export class CopilotStore extends BaseStore {
     repositoryPath?: string,
     credentials: ICopilotCredentialContext = this.createCredentialContext(
       account
-    )
+    ),
+    useHostFileSystem = false
   ): Promise<CopilotClient> {
     const runtimePath = getCopilotRuntimePath(join(__dirname, 'copilot'))
     if (!(await pathExists(runtimePath))) {
@@ -928,10 +940,12 @@ export class CopilotStore extends BaseStore {
         }`,
       },
       workingDirectory: repositoryPath,
-      sessionFs: getCopilotInMemorySessionFsConfig(
-        repositoryPath,
-        __WIN32__ ? 'windows' : 'posix'
-      ),
+      sessionFs: useHostFileSystem
+        ? undefined
+        : getCopilotInMemorySessionFsConfig(
+            repositoryPath,
+            __WIN32__ ? 'windows' : 'posix'
+          ),
       gitHubToken: accessToken,
     })
     if (credentials.tokenProvider !== undefined) {
@@ -1867,5 +1881,95 @@ export class CopilotStore extends BaseStore {
     } finally {
       this.stopClient(client)
     }
+  }
+
+  private getAgentChats(repositoryPath: string) {
+    let chats = this.agentSessions.get(repositoryPath)
+    if (chats === undefined) {
+      chats = { sessions: [], active: null }
+      this.agentSessions.set(repositoryPath, chats)
+    }
+    return chats
+  }
+
+  public getAgentSession(repositoryPath: string) {
+    return this.agentSessions.get(repositoryPath)?.active ?? null
+  }
+
+  /** The repository's agent chats, newest first. */
+  public getAgentSessions(
+    repositoryPath: string
+  ): ReadonlyArray<CopilotAgentSession> {
+    return this.agentSessions.get(repositoryPath)?.sessions ?? []
+  }
+
+  /**
+   * The active agent chat for the repository. The same session is reused for
+   * follow-up messages until another chat is selected or a new one starts.
+   */
+  public getOrCreateAgentSession(
+    account: Account,
+    repository: Repository,
+    onWorkspaceChanged: (paths: ReadonlyArray<string>) => void
+  ) {
+    const chats = this.getAgentChats(repository.path)
+    if (chats.active !== null) {
+      return chats.active
+    }
+    const session = new CopilotAgentSession(
+      repository.path,
+      {
+        createClient: () =>
+          this.createClient(
+            account,
+            repository.path,
+            this.createCredentialContext(account),
+            true
+          ),
+        createSession: (client, config) => this.createSession(client, config),
+        stopClient: client => this.stopClient(client),
+      },
+      onWorkspaceChanged
+    )
+    chats.active = session
+    chats.sessions = [session, ...chats.sessions]
+    for (const stale of chats.sessions.slice(MaxAgentChatsPerRepository)) {
+      stale.dispose()
+    }
+    chats.sessions = chats.sessions.slice(0, MaxAgentChatsPerRepository)
+    return session
+  }
+
+  /** Leaves the current chat in history; the next message starts a new one. */
+  public startNewAgentChat(repositoryPath: string) {
+    const chats = this.getAgentChats(repositoryPath)
+    const active = chats.active
+    if (active !== null && active.isEmpty) {
+      chats.sessions = chats.sessions.filter(s => s !== active)
+      active.dispose()
+    }
+    chats.active = null
+  }
+
+  public selectAgentSession(
+    repositoryPath: string,
+    session: CopilotAgentSession
+  ) {
+    const chats = this.getAgentChats(repositoryPath)
+    if (chats.sessions.includes(session)) {
+      chats.active = session
+    }
+  }
+
+  public async deleteAgentSession(
+    repositoryPath: string,
+    session: CopilotAgentSession
+  ) {
+    const chats = this.getAgentChats(repositoryPath)
+    chats.sessions = chats.sessions.filter(s => s !== session)
+    if (chats.active === session) {
+      chats.active = null
+    }
+    await session.dispose()
   }
 }

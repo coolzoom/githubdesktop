@@ -19,6 +19,7 @@ import {
 import { GraphMenus, IGraphMenuContext } from './history-graph/graph-menus'
 import { IWipCommitOptions } from './history-graph/wip-panel'
 import { FileExplorer } from './file-explorer/file-explorer'
+import { CopilotAgentPanel } from './copilot-agent/copilot-agent-panel'
 import { getRepositoryEditors } from './editor/editor-store'
 import { runInTerminal } from './terminal-panel/terminal-sessions'
 import { TooltippedContent } from './lib/tooltipped-content'
@@ -169,9 +170,15 @@ interface IRepositoryViewState {
   readonly openWipFileRequest: IOpenWipFileRequest | null
 }
 
-type SidebarView = 'explorer' | 'branches'
+type SidebarView = 'explorer' | 'branches' | 'copilot'
 
 const sidebarViewKey = 'repository-sidebar-view'
+
+function parseSidebarView(value: string | null): SidebarView {
+  return value === 'explorer' || value === 'copilot' || value === 'branches'
+    ? value
+    : 'branches'
+}
 
 /** Single quote a path for a POSIX shell or wrap it in double quotes. */
 function quoteForShell(path: string) {
@@ -216,10 +223,7 @@ export class RepositoryView extends React.Component<
 
     this.state = {
       changesListScrollTop: 0,
-      sidebarView:
-        localStorage.getItem(sidebarViewKey) === 'explorer'
-          ? 'explorer'
-          : 'branches',
+      sidebarView: parseSidebarView(localStorage.getItem(sidebarViewKey)),
       openWipFileRequest: null,
     }
   }
@@ -452,6 +456,8 @@ export class RepositoryView extends React.Component<
 
   private onShowBranches = () => this.setSidebarView('branches')
 
+  private onShowCopilot = () => this.setSidebarView('copilot')
+
   private onOpenChangedFile = (path: string) =>
     this.setState(state => ({
       openWipFileRequest: {
@@ -527,6 +533,12 @@ export class RepositoryView extends React.Component<
             octicons.gitBranch,
             this.onShowBranches
           )}
+          {this.renderActivityButton(
+            'copilot',
+            'Copilot Agent',
+            octicons.copilot,
+            this.onShowCopilot
+          )}
         </div>
         <div className="unified-sidebar-view">
           {this.state.sidebarView === 'explorer' ? (
@@ -540,6 +552,12 @@ export class RepositoryView extends React.Component<
               onOpenFile={this.onOpenFile}
               onPathRenamed={this.onPathRenamed}
               onOpenInTerminal={this.onOpenInTerminal}
+            />
+          ) : this.state.sidebarView === 'copilot' ? (
+            <CopilotAgentPanel
+              repository={repository}
+              dispatcher={this.props.dispatcher}
+              accounts={this.props.accounts}
             />
           ) : (
             this.renderRefPanel()

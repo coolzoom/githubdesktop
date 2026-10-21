@@ -184,6 +184,7 @@ import { assertNever, fatalError, forceUnwrap } from '../fatal-error'
 import { formatCommitMessage } from '../format-commit-message'
 import {
   getAccountForCommitMessageGeneration,
+  getAccountForCopilotAgent,
   getAccountForCopilotConflictResolution,
   getAccountForRepository,
 } from '../get-account-for-repository'
@@ -453,6 +454,7 @@ import {
 } from '../../models/worktree'
 import { shouldShowWorktreeDropdown } from '../worktree-dropdown'
 import type { Model } from '../copilot/types'
+import type { CopilotAgentSession } from './copilot-agent-session'
 
 const LastSelectedRepositoryIDKey = 'last-selected-repository-id'
 
@@ -6468,6 +6470,54 @@ export class AppStore extends TypedBaseStore<IAppState> {
       offsetFromNow(-30, 'days') <=
         this.copilotConflictResolutionDisclaimerLastSeen
     )
+  }
+
+  /**
+   * The Copilot agent session for this repository, creating one when the
+   * signed-in account can use Copilot.
+   */
+  public getOrCreateCopilotAgentSession(
+    repository: Repository,
+    onWorkspaceChanged: (paths: ReadonlyArray<string>) => void
+  ) {
+    const account = getAccountForCopilotAgent(this.accounts, repository)
+    if (account === undefined) {
+      return null
+    }
+    return this.copilotStore.getOrCreateAgentSession(
+      account,
+      repository,
+      async paths => {
+        await this._loadStatus(repository)
+        onWorkspaceChanged(paths)
+      }
+    )
+  }
+
+  public getCopilotAgentSession(repository: Repository) {
+    return this.copilotStore.getAgentSession(repository.path)
+  }
+
+  public getCopilotAgentSessions(repository: Repository) {
+    return this.copilotStore.getAgentSessions(repository.path)
+  }
+
+  public startNewCopilotAgentChat(repository: Repository) {
+    this.copilotStore.startNewAgentChat(repository.path)
+  }
+
+  public selectCopilotAgentSession(
+    repository: Repository,
+    session: CopilotAgentSession
+  ) {
+    this.copilotStore.selectAgentSession(repository.path, session)
+  }
+
+  public deleteCopilotAgentSession(
+    repository: Repository,
+    session: CopilotAgentSession
+  ) {
+    return this.copilotStore.deleteAgentSession(repository.path, session)
   }
 
   public async _generateCommitMessage(

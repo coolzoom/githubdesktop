@@ -133,6 +133,7 @@ import { ICustomIntegration } from '../../lib/custom-integration'
 import { isAbsolute } from 'path'
 import { CLIAction } from '../../lib/cli-action'
 import { BypassReasonType } from '../secret-scanning/bypass-push-protection-dialog'
+import type { CopilotAgentSession } from '../../lib/stores/copilot-agent-session'
 import {
   IConflictResolutionProgress,
   IFileResolution,
@@ -1197,6 +1198,42 @@ export class Dispatcher {
 
   public updateCommitMessageGenerationDisclaimerLastSeen() {
     return this.appStore._updateCommitMessageGenerationDisclaimerLastSeen()
+  }
+
+  public getOrCreateCopilotAgentSession(
+    repository: Repository,
+    onWorkspaceChanged: (paths: ReadonlyArray<string>) => void
+  ) {
+    return this.appStore.getOrCreateCopilotAgentSession(
+      repository,
+      onWorkspaceChanged
+    )
+  }
+
+  public getCopilotAgentSession(repository: Repository) {
+    return this.appStore.getCopilotAgentSession(repository)
+  }
+
+  public getCopilotAgentSessions(repository: Repository) {
+    return this.appStore.getCopilotAgentSessions(repository)
+  }
+
+  public startNewCopilotAgentChat(repository: Repository) {
+    this.appStore.startNewCopilotAgentChat(repository)
+  }
+
+  public selectCopilotAgentSession(
+    repository: Repository,
+    session: CopilotAgentSession
+  ) {
+    this.appStore.selectCopilotAgentSession(repository, session)
+  }
+
+  public deleteCopilotAgentSession(
+    repository: Repository,
+    session: CopilotAgentSession
+  ) {
+    return this.appStore.deleteCopilotAgentSession(repository, session)
   }
 
   public generateCommitMessage(

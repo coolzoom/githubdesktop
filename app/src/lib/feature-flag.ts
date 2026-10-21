@@ -119,6 +119,11 @@ export const enableCopilotSdkCommitMessageGeneration = (account: Account) => {
 /** Should we enable Copilot-powered merge conflict resolution? */
 export const enableCopilotConflictResolution = () => true
 
+/** Should the in-app Copilot agent chat be available? */
+export const enableCopilotAgent = (account: Account) =>
+  enableCopilotSdkCommitMessageGeneration(account) &&
+  account.isCopilotDesktopEnabled === true
+
 export function enableAccessibleListToolTips(): boolean {
   return enableBetaFeatures()
 }
