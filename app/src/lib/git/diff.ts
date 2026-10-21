@@ -843,7 +843,7 @@ async function buildSubmoduleDiff(
   }
 }
 
-async function buildDiff(
+export async function buildDiff(
   buffer: Buffer,
   repository: Repository,
   file: FileChange,

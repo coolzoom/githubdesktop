@@ -177,6 +177,24 @@ export function popStash(repository: Repository, name: string) {
   return git(['stash', 'pop', name], repository.path, 'popStash')
 }
 
+export function stashAllChanges(repository: Repository) {
+  return git(
+    ['stash', 'push', '--include-untracked'],
+    repository.path,
+    'stashAllChanges'
+  )
+}
+
+/**
+ * Pop a stash leaving every restored change unstaged. The entry is only
+ * dropped once it applied cleanly, so a conflicting pop keeps the stash.
+ */
+export async function popStashUnstaged(repository: Repository, name: string) {
+  await git(['stash', 'apply', name], repository.path, 'popStashUnstaged')
+  await git(['reset', '-q'], repository.path, 'popStashUnstaged')
+  await git(['stash', 'drop', name], repository.path, 'popStashUnstaged')
+}
+
 export function dropStash(repository: Repository, name: string) {
   return git(['stash', 'drop', name], repository.path, 'dropStash')
 }

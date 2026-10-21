@@ -113,6 +113,7 @@ interface IPreferencesProps {
   readonly selectedTheme: ApplicationTheme
   readonly selectedTabSize: number
   readonly alwaysShowWorktreeList: boolean
+  readonly classicRepositoryLayout: boolean
   readonly useCustomEditor: boolean
   readonly customEditor: ICustomIntegration | null
   readonly useCustomShell: boolean
@@ -178,6 +179,7 @@ interface IPreferencesState {
   readonly initiallySelectedTheme: ApplicationTheme
   readonly initiallySelectedTabSize: number
   readonly alwaysShowWorktreeList: boolean
+  readonly classicRepositoryLayout: boolean
 
   readonly isLoadingGitConfig: boolean
 
@@ -256,6 +258,7 @@ export class Preferences extends React.Component<
       initiallySelectedTheme: this.props.selectedTheme,
       initiallySelectedTabSize: this.props.selectedTabSize,
       alwaysShowWorktreeList: this.props.alwaysShowWorktreeList,
+      classicRepositoryLayout: this.props.classicRepositoryLayout,
       isLoadingGitConfig: true,
       underlineLinks: this.props.underlineLinks,
       showDiffCheckMarks: this.props.showDiffCheckMarks,
@@ -659,6 +662,10 @@ export class Preferences extends React.Component<
             onAlwaysShowWorktreeListChanged={
               this.onAlwaysShowWorktreeListChanged
             }
+            classicRepositoryLayout={this.state.classicRepositoryLayout}
+            onClassicRepositoryLayoutChanged={
+              this.onClassicRepositoryLayoutChanged
+            }
             selectedDateFormat={
               this.state.selectedDateFormat ?? getDateFormatPreference()
             }
@@ -1000,6 +1007,12 @@ export class Preferences extends React.Component<
     this.setState({ alwaysShowWorktreeList })
   }
 
+  private onClassicRepositoryLayoutChanged = (
+    classicRepositoryLayout: boolean
+  ) => {
+    this.setState({ classicRepositoryLayout })
+  }
+
   private renderFooter() {
     const hasDisabledError = this.state.disallowedCharactersMessage != null
 
@@ -1187,6 +1200,7 @@ export class Preferences extends React.Component<
 
     dispatcher.setDiffCheckMarksSetting(this.state.showDiffCheckMarks)
     dispatcher.setAlwaysShowWorktreeList(this.state.alwaysShowWorktreeList)
+    dispatcher.setClassicRepositoryLayout(this.state.classicRepositoryLayout)
 
     dispatcher.setSelectedCopilotModelsByAccount(
       this.state.selectedCopilotModelsByAccount

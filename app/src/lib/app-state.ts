@@ -402,6 +402,12 @@ export interface IAppState {
   /** Whether or not the user will see check marks indicating a line is included in the check in the diff */
   readonly showDiffCheckMarks: boolean
 
+  /**
+   * Whether repositories use Desktop's separate Changes and History tabs
+   * instead of the single GitKraken-style graph view that commits the index.
+   */
+  readonly classicRepositoryLayout: boolean
+
   /** Whether the user prefers absolute dates over relative time in lists */
   readonly preferAbsoluteDates: boolean
 

@@ -398,6 +398,11 @@ export class Dispatcher {
     return this.appStore._refreshOrRecoverRepository(repository)
   }
 
+  /** Reload only the working directory status, e.g. after staging changes. */
+  public async refreshStatus(repository: Repository): Promise<void> {
+    await this.appStore._loadStatus(repository)
+  }
+
   /**
    * Refresh the commit author of a repository. Required after changing git's
    * user name or email address.
@@ -4244,6 +4249,10 @@ export class Dispatcher {
 
   public setDiffCheckMarksSetting(diffCheckMarks: boolean) {
     return this.appStore._updateShowDiffCheckMarks(diffCheckMarks)
+  }
+
+  public setClassicRepositoryLayout(classic: boolean) {
+    return this.appStore._setClassicRepositoryLayout(classic)
   }
 
   /** Set whether the worktree list is shown even without linked worktrees. */

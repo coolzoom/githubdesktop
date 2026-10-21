@@ -21,14 +21,18 @@ export async function createCommit(
     noVerify?: boolean
     signOff?: boolean
     allowEmpty?: boolean
+    /** Commit the index as it is instead of staging `files` first. */
+    commitIndex?: boolean
   } & HookCallbackOptions
 ): Promise<string> {
-  // Clear the staging area, our diffs reflect the difference between the
-  // working directory and the last commit (if any) so our commits should
-  // do the same thing.
-  await unstageAll(repository)
+  if (!options?.commitIndex) {
+    // Clear the staging area, our diffs reflect the difference between the
+    // working directory and the last commit (if any) so our commits should
+    // do the same thing.
+    await unstageAll(repository)
 
-  await stageFiles(repository, files)
+    await stageFiles(repository, files)
+  }
 
   const args = ['-F', '-']
 

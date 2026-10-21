@@ -27,6 +27,15 @@ export enum AppFileStatusKind {
 }
 
 /**
+ * The two columns of `git status --porcelain`: what is staged in the index
+ * relative to HEAD, and what is left in the working tree relative to the index.
+ */
+export interface IStagingStatus {
+  readonly index: GitStatusEntry
+  readonly workingTree: GitStatusEntry
+}
+
+/**
  * Normal changes to a repository detected by GitHub Desktop
  */
 export type PlainFileStatus = {
@@ -35,6 +44,7 @@ export type PlainFileStatus = {
     | AppFileStatusKind.Modified
     | AppFileStatusKind.Deleted
   submoduleStatus?: SubmoduleStatus
+  staging?: IStagingStatus
 }
 
 /**
@@ -49,6 +59,7 @@ export type CopiedOrRenamedFileStatus = {
   oldPath: string
   renameIncludesModifications: boolean
   submoduleStatus?: SubmoduleStatus
+  staging?: IStagingStatus
 }
 
 /**

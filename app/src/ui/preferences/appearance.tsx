@@ -30,6 +30,8 @@ interface IAppearanceProps {
   readonly onSelectedTabSizeChanged: (tabSize: number) => void
   readonly alwaysShowWorktreeList: boolean
   readonly onAlwaysShowWorktreeListChanged: (value: boolean) => void
+  readonly classicRepositoryLayout: boolean
+  readonly onClassicRepositoryLayoutChanged: (value: boolean) => void
   readonly selectedDateFormat: DateFormat
   readonly onSelectedDateFormatChanged: (format: DateFormat) => void
   readonly selectedTimeFormat: TimeFormat
@@ -137,6 +139,12 @@ export class Appearance extends React.Component<
     event: React.FormEvent<HTMLInputElement>
   ) => {
     this.props.onAlwaysShowWorktreeListChanged(event.currentTarget.checked)
+  }
+
+  private onClassicRepositoryLayoutChanged = (
+    event: React.FormEvent<HTMLInputElement>
+  ) => {
+    this.props.onClassicRepositoryLayoutChanged(event.currentTarget.checked)
   }
 
   public renderThemeSwatch = (theme: ApplicationTheme) => {
@@ -302,10 +310,34 @@ export class Appearance extends React.Component<
     )
   }
 
+  private renderLayout() {
+    return (
+      <div className="appearance-section">
+        <h2 id="layout-heading">Layout</h2>
+
+        <Checkbox
+          className="classic-repository-layout"
+          label="Use classic Changes and History tabs"
+          value={
+            this.props.classicRepositoryLayout
+              ? CheckboxValue.On
+              : CheckboxValue.Off
+          }
+          onChange={this.onClassicRepositoryLayoutChanged}
+        />
+        <p className="settings-description">
+          When off, a single commit graph is used: select the WIP row to stage
+          files, hunks or lines and commit what is staged.
+        </p>
+      </div>
+    )
+  }
+
   public render() {
     return (
       <DialogContent>
         {this.renderSelectedTheme()}
+        {this.renderLayout()}
         {this.renderFormatting()}
         {this.renderMiscellaneous()}
       </DialogContent>

@@ -1782,6 +1782,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             underlineLinks={this.state.underlineLinks}
             showDiffCheckMarks={this.state.showDiffCheckMarks}
             alwaysShowWorktreeList={this.state.alwaysShowWorktreeList}
+            classicRepositoryLayout={this.state.classicRepositoryLayout}
             selectedCopilotModelsByAccount={
               this.state.selectedCopilotModelsByAccount
             }
@@ -4007,6 +4008,7 @@ export class App extends React.Component<IAppProps, IAppState> {
           showDiffCheckMarks={state.showDiffCheckMarks}
           showSideBySideDiff={state.showSideBySideDiff}
           graphCommitOrder={state.graphCommitOrder}
+          classicRepositoryLayout={state.classicRepositoryLayout}
           focusCommitMessage={state.focusCommitMessage}
           askForConfirmationOnDiscardChanges={
             state.askForConfirmationOnDiscardChanges

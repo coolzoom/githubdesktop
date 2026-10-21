@@ -6,8 +6,13 @@ import { Branch } from '../../models/branch'
 import { Commit } from '../../models/commit'
 import { Account } from '../../models/account'
 import { IGraphStash } from '../../models/stash-entry'
-import { CommittedFileChange } from '../../models/status'
-import { ImageDiffType } from '../../models/diff'
+import {
+  CommittedFileChange,
+  WorkingDirectoryFileChange,
+} from '../../models/status'
+import { IDiff, ImageDiffType } from '../../models/diff'
+import { hasStagedChanges, hasUnstagedChanges } from '../../lib/staging'
+import { getStagingDiff } from '../../lib/git/staging'
 import { TipState } from '../../models/tip'
 import { GraphCommitOrder } from '../../lib/git/graph'
 import {
@@ -26,6 +31,7 @@ import {
   GraphRefKind,
   IGraphRefGroup,
   IGraphRow,
+  WorkDirSha,
 } from './graph-model'
 import { CommitGraph } from './commit-graph'
 import { CommitDetails } from './commit-details'
@@ -38,6 +44,8 @@ import { GraphMenus } from './graph-menus'
 import { RemoteForm } from './remote-form'
 import { ConflictBar, getConflictInfo } from './conflict-bar'
 import { MergeConflictEditor } from '../merge-conflict-editor/merge-conflict-editor'
+import { IWipCommitOptions, IWipFileSelection, WipPanel } from './wip-panel'
+import { WorkingFileDiff } from './working-file-diff'
 
 const MinDetailsWidth = 240
 const MaxDetailsWidth = 700
@@ -62,6 +70,15 @@ interface IHistoryGraphViewProps {
   readonly onSelectSha: (sha: string) => void
   /** Check out the most relevant ref of a pill that was double-clicked */
   readonly onCheckoutRefGroup: (group: IGraphRefGroup) => void
+  /**
+   * Whether this view replaces the Changes tab too: selecting the WIP row
+   * shows the staging panel instead of switching tabs.
+   */
+  readonly unifiedLayout: boolean
+  readonly wipOptions: IWipCommitOptions
+  readonly hideWhitespaceInChangesDiff: boolean
+  readonly showDiffCheckMarks: boolean
+  readonly askForConfirmationOnDiscardChanges: boolean
 }
 
 interface IHistoryGraphViewState {
@@ -72,6 +89,9 @@ interface IHistoryGraphViewState {
   readonly remoteForm: IRemoteFormRequest | null
   /** The conflicted file open in the merge tool in place of the graph */
   readonly mergeToolPath: string | null
+  /** The working directory file whose diff is open in place of the graph */
+  readonly wipFile: IWipFileSelection | null
+  readonly wipDiff: IDiff | null
 }
 
 /**
@@ -84,6 +104,9 @@ export class HistoryGraphView extends React.Component<
 > {
   private subscription: Disposable | null = null
   private resizeStart: { x: number; width: number } | null = null
+  private wipDiffFor: WorkingDirectoryFileChange | null = null
+  private wipDiffStaged = false
+  private wipDiffRequest = 0
 
   private getStashMap = memoizeOne(
     (stashes: ReadonlyArray<IGraphStash>) =>
@@ -125,6 +148,13 @@ export class HistoryGraphView extends React.Component<
 
   private getConflictInfo = memoizeOne(getConflictInfo)
 
+  private getMergeablePaths = memoizeOne(
+    (info: ReturnType<typeof getConflictInfo>): ReadonlySet<string> =>
+      new Set(info?.files.filter(f => f.canMerge).map(f => f.path) ?? [])
+  )
+
+  private readonly wipSelection: ReadonlyArray<string> = [WorkDirSha]
+
   public constructor(props: IHistoryGraphViewProps) {
     super(props)
     this.state = this.storeState()
@@ -135,6 +165,8 @@ export class HistoryGraphView extends React.Component<
     return {
       isDiffOpen: this.state?.isDiffOpen ?? false,
       mergeToolPath: this.state?.mergeToolPath ?? null,
+      wipFile: this.state?.wipFile ?? null,
+      wipDiff: this.state?.wipDiff ?? null,
       settings: graphViewStore.getSettings(id),
       searchText: graphViewStore.getSearchText(id),
       detailsWidth: graphViewStore.columns.detailsWidth,
@@ -176,10 +208,109 @@ export class HistoryGraphView extends React.Component<
         ...this.storeState(),
         isDiffOpen: false,
         mergeToolPath: null,
+        wipFile: null,
+        wipDiff: null,
       })
       this.initializeHistory()
     }
+    if (
+      prevProps.hideWhitespaceInChangesDiff !==
+      this.props.hideWhitespaceInChangesDiff
+    ) {
+      this.wipDiffFor = null
+    }
+    this.syncWipFile()
     this.refreshTracking()
+  }
+
+  /** Whether the WIP row is selected and the staging panel is showing. */
+  private get isWipSelected() {
+    const { unifiedLayout, state } = this.props
+    return (
+      unifiedLayout &&
+      state.selectedSection === RepositorySectionTab.Changes &&
+      this.workDirChangeCount > 0
+    )
+  }
+
+  private get wipWorkingFile(): WorkingDirectoryFileChange | null {
+    const { wipFile } = this.state
+    if (wipFile === null) {
+      return null
+    }
+    const { files } = this.props.state.changesState.workingDirectory
+    return files.find(f => f.path === wipFile.path) ?? null
+  }
+
+  /**
+   * Keep the open working file valid as the status changes: follow it to the
+   * other list once one half is fully staged or unstaged, close it once it
+   * has no changes, and reload its diff whenever its status is refreshed.
+   */
+  private syncWipFile() {
+    const { wipFile } = this.state
+    if (wipFile === null) {
+      return
+    }
+    const file = this.wipWorkingFile
+    if (file === null || !this.isWipSelected) {
+      this.closeWipFile()
+      return
+    }
+
+    const hasSide = (staged: boolean) =>
+      staged ? hasStagedChanges(file) : hasUnstagedChanges(file)
+    if (!hasSide(wipFile.staged)) {
+      if (hasSide(!wipFile.staged)) {
+        this.setState({ wipFile: { path: file.path, staged: !wipFile.staged } })
+      } else {
+        this.closeWipFile()
+      }
+      return
+    }
+
+    if (file !== this.wipDiffFor || wipFile.staged !== this.wipDiffStaged) {
+      this.loadWipDiff(file, wipFile.staged)
+    }
+  }
+
+  private async loadWipDiff(file: WorkingDirectoryFileChange, staged: boolean) {
+    this.wipDiffFor = file
+    this.wipDiffStaged = staged
+    const request = ++this.wipDiffRequest
+    const { repository, hideWhitespaceInChangesDiff } = this.props
+    let diff: IDiff | null = null
+    try {
+      diff = await getStagingDiff(
+        repository,
+        file,
+        staged,
+        hideWhitespaceInChangesDiff
+      )
+    } catch (e) {
+      log.error(`Failed to load the diff of ${file.path}`, e)
+    }
+    if (request === this.wipDiffRequest) {
+      this.setState({ wipDiff: diff })
+    }
+  }
+
+  private closeWipFile = () => {
+    this.wipDiffFor = null
+    this.wipDiffRequest++
+    this.setState({ wipFile: null, wipDiff: null })
+  }
+
+  private onWipFileSelected = (selection: IWipFileSelection) => {
+    const { wipFile } = this.state
+    const isSame =
+      wipFile?.path === selection.path && wipFile.staged === selection.staged
+    this.setState({
+      wipFile: selection,
+      wipDiff: isSame ? this.state.wipDiff : null,
+      isDiffOpen: false,
+      mergeToolPath: null,
+    })
   }
 
   private refreshTracking() {
@@ -230,7 +361,16 @@ export class HistoryGraphView extends React.Component<
     shas: ReadonlyArray<string>,
     isContiguous: boolean
   ) => {
-    const { dispatcher, repository } = this.props
+    const { dispatcher, repository, unifiedLayout, state } = this.props
+    if (
+      unifiedLayout &&
+      state.selectedSection === RepositorySectionTab.Changes
+    ) {
+      dispatcher.changeRepositorySection(
+        repository,
+        RepositorySectionTab.History
+      )
+    }
     dispatcher.changeCommitSelection(repository, shas, isContiguous)
     dispatcher.loadChangedFilesForCurrentSelection(repository)
   }
@@ -380,6 +520,14 @@ export class HistoryGraphView extends React.Component<
     this.props.dispatcher.setGraphCommitOrder(this.props.repository, order)
   }
 
+  private onStashClick = () => {
+    this.props.menus.stashChanges()
+  }
+
+  private onPopStashClick = () => {
+    this.props.menus.popLatestStash()
+  }
+
   private renderGraph() {
     const { state, repository } = this.props
     const graph = this.graph
@@ -388,7 +536,9 @@ export class HistoryGraphView extends React.Component<
         graph={graph}
         commitLookup={state.commitLookup}
         stashes={this.getStashMap(state.graphStashes)}
-        selectedShas={state.commitSelection.shas}
+        selectedShas={
+          this.isWipSelected ? this.wipSelection : state.commitSelection.shas
+        }
         emoji={this.props.emoji}
         accounts={this.props.accounts}
         gitHubRepository={repository.gitHubRepository}
@@ -396,6 +546,9 @@ export class HistoryGraphView extends React.Component<
         tracking={graphViewStore.getTracking(repository.id)}
         commitOrder={this.props.graphCommitOrder}
         onCommitOrderChanged={this.onCommitOrderChanged}
+        canPopStash={state.graphStashes.length > 0}
+        onStash={this.onStashClick}
+        onPopStash={this.onPopStashClick}
         loadedCount={state.compareState.commitSHAs.length}
         searchText={this.state.searchText}
         onSearchTextChanged={this.onSearchTextChanged}
@@ -410,7 +563,7 @@ export class HistoryGraphView extends React.Component<
   }
 
   private renderDetails() {
-    const { state, repository } = this.props
+    const { state } = this.props
     const { commitSelection, commitLookup } = state
     const commits = commitSelection.shas
       .map(sha => commitLookup.get(sha))
@@ -431,24 +584,55 @@ export class HistoryGraphView extends React.Component<
           onMouseDown={this.onResizeStart}
           onDoubleClick={this.onResizeReset}
         />
-        <CommitDetails
-          repository={repository}
-          commits={commits}
-          isContiguous={commitSelection.isContiguous}
-          changesetData={commitSelection.changesetData}
-          selectedFile={commitSelection.file}
-          isDiffOpen={this.state.isDiffOpen}
-          stash={stash}
-          emoji={this.props.emoji}
-          accounts={this.props.accounts}
-          treeView={this.state.settings.treeView}
-          onTreeViewChanged={this.onTreeViewChanged}
-          onFileSelected={this.onFileSelected}
-          onFileDoubleClick={this.onFileDoubleClick}
-          onFileContextMenu={this.onFileContextMenu}
-          onCommitShaClicked={this.props.onSelectSha}
-        />
+        {this.isWipSelected
+          ? this.renderWipPanel()
+          : this.renderCommitDetails(commits, stash)}
       </div>
+    )
+  }
+
+  private renderWipPanel() {
+    return (
+      <WipPanel
+        repository={this.props.repository}
+        dispatcher={this.props.dispatcher}
+        state={this.props.state}
+        menus={this.props.menus}
+        emoji={this.props.emoji}
+        accounts={this.props.accounts}
+        options={this.props.wipOptions}
+        selectedFile={this.state.wipFile}
+        mergeablePaths={this.getMergeablePaths(this.conflictInfo)}
+        onFileSelected={this.onWipFileSelected}
+        onOpenMergeTool={this.onOpenConflictFile}
+      />
+    )
+  }
+
+  private renderCommitDetails(
+    commits: ReadonlyArray<Commit>,
+    stash: IGraphStash | null
+  ) {
+    const { state, repository } = this.props
+    const { commitSelection } = state
+    return (
+      <CommitDetails
+        repository={repository}
+        commits={commits}
+        isContiguous={commitSelection.isContiguous}
+        changesetData={commitSelection.changesetData}
+        selectedFile={commitSelection.file}
+        isDiffOpen={this.state.isDiffOpen}
+        stash={stash}
+        emoji={this.props.emoji}
+        accounts={this.props.accounts}
+        treeView={this.state.settings.treeView}
+        onTreeViewChanged={this.onTreeViewChanged}
+        onFileSelected={this.onFileSelected}
+        onFileDoubleClick={this.onFileDoubleClick}
+        onFileContextMenu={this.onFileContextMenu}
+        onCommitShaClicked={this.props.onSelectSha}
+      />
     )
   }
 
@@ -516,10 +700,42 @@ export class HistoryGraphView extends React.Component<
     )
   }
 
+  private renderWorkingFileDiff(
+    file: WorkingDirectoryFileChange,
+    staged: boolean
+  ) {
+    return (
+      <WorkingFileDiff
+        repository={this.props.repository}
+        dispatcher={this.props.dispatcher}
+        file={file}
+        staged={staged}
+        diff={this.state.wipDiff}
+        isCommitting={this.props.state.isCommitting}
+        imageDiffType={this.props.imageDiffType}
+        hideWhitespaceInDiff={this.props.hideWhitespaceInChangesDiff}
+        showSideBySideDiff={this.props.showSideBySideDiff}
+        showDiffCheckMarks={this.props.showDiffCheckMarks}
+        askForConfirmationOnDiscardChanges={
+          this.props.askForConfirmationOnDiscardChanges
+        }
+        onOpenBinaryFile={this.props.onOpenBinaryFile}
+        onOpenSubmodule={this.props.onOpenSubmodule}
+        onChangeImageDiffType={this.props.onChangeImageDiffType}
+        onDiffOptionsOpened={this.props.onDiffOptionsOpened}
+        onClose={this.closeWipFile}
+      />
+    )
+  }
+
   private renderCenter() {
     const { mergeToolPath } = this.state
     if (mergeToolPath !== null && this.conflictInfo !== null) {
       return this.renderMergeTool(mergeToolPath)
+    }
+    const wipFile = this.isWipSelected ? this.wipWorkingFile : null
+    if (wipFile !== null && this.state.wipFile !== null) {
+      return this.renderWorkingFileDiff(wipFile, this.state.wipFile.staged)
     }
     const showDiff =
       this.state.isDiffOpen && this.props.state.commitSelection.file !== null

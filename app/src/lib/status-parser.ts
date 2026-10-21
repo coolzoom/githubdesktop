@@ -421,6 +421,29 @@ export function mapStatus(
   return {
     kind: 'ordinary',
     type: 'modified',
+    index: toStagingEntry(statusCode.charAt(0)),
+    workingTree: toStagingEntry(statusCode.charAt(1)),
     submoduleStatus,
+  }
+}
+
+/**
+ * One column of a porcelain status code. Type changes (`T`) count as
+ * modifications.
+ */
+function toStagingEntry(code: string): GitStatusEntry {
+  switch (code) {
+    case GitStatusEntry.Unchanged:
+      return GitStatusEntry.Unchanged
+    case GitStatusEntry.Added:
+      return GitStatusEntry.Added
+    case GitStatusEntry.Deleted:
+      return GitStatusEntry.Deleted
+    case GitStatusEntry.Renamed:
+      return GitStatusEntry.Renamed
+    case GitStatusEntry.Copied:
+      return GitStatusEntry.Copied
+    default:
+      return GitStatusEntry.Modified
   }
 }

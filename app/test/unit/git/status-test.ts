@@ -260,6 +260,10 @@ describe('git/status', () => {
           oldPath: 'foo',
           renameIncludesModifications: false,
           submoduleStatus: undefined,
+          staging: {
+            index: GitStatusEntry.Renamed,
+            workingTree: GitStatusEntry.Unchanged,
+          },
         })
       })
 
@@ -291,6 +295,10 @@ describe('git/status', () => {
           oldPath: 'CONTRIBUTING.md',
           submoduleStatus: undefined,
           renameIncludesModifications: false,
+          staging: {
+            index: GitStatusEntry.Copied,
+            workingTree: GitStatusEntry.Unchanged,
+          },
         })
       })
 

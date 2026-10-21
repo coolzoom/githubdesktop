@@ -14,6 +14,7 @@ import {
   primaryRef,
 } from './history-graph/history-graph-view'
 import { GraphMenus, IGraphMenuContext } from './history-graph/graph-menus'
+import { IWipCommitOptions } from './history-graph/wip-panel'
 import { IGraphRef, IGraphRefGroup } from './history-graph/graph-model'
 import { graphViewStore } from './history-graph/graph-view-store'
 import { IRemote } from '../models/remote'
@@ -59,6 +60,8 @@ interface IRepositoryViewProps {
   readonly hideWhitespaceInHistoryDiff: boolean
   readonly showSideBySideDiff: boolean
   readonly graphCommitOrder: GraphCommitOrder
+  /** Use the separate Changes and History tabs instead of the single graph */
+  readonly classicRepositoryLayout: boolean
   readonly showDiffCheckMarks: boolean
   readonly askForConfirmationOnDiscardChanges: boolean
   readonly askForConfirmationOnCommitFilteredChanges: boolean
@@ -176,6 +179,8 @@ export class RepositoryView extends React.Component<
       state: this.props.state,
       askForConfirmationOnCheckoutCommit:
         this.props.askForConfirmationOnCheckoutCommit,
+      askForConfirmationOnDiscardChanges:
+        this.props.askForConfirmationOnDiscardChanges,
       externalEditorLabel: this.props.externalEditorLabel,
       onCherryPick: this.props.onCherryPick,
       onViewCommitOnGitHub: this.props.onViewCommitOnGitHub,
@@ -399,7 +404,9 @@ export class RepositoryView extends React.Component<
   private renderSidebarContents(): JSX.Element {
     const selectedSection = this.props.state.selectedSection
 
-    if (selectedSection === RepositorySectionTab.Changes) {
+    if (!this.props.classicRepositoryLayout) {
+      return this.renderRefPanel()
+    } else if (selectedSection === RepositorySectionTab.Changes) {
       return this.renderChangesSidebar()
     } else if (selectedSection === RepositorySectionTab.History) {
       return this.renderRefPanel()
@@ -428,7 +435,7 @@ export class RepositoryView extends React.Component<
           onResize={this.handleSidebarResize}
           description="Repository sidebar"
         >
-          {this.renderTabs()}
+          {this.props.classicRepositoryLayout ? this.renderTabs() : null}
           {this.renderSidebarContents()}
         </Resizable>
       </FocusContainer>
@@ -507,8 +514,37 @@ export class RepositoryView extends React.Component<
         onOpenInExternalEditor={this.props.onOpenInExternalEditor}
         onSelectSha={this.selectSha}
         onCheckoutRefGroup={this.onCheckoutRefGroup}
+        unifiedLayout={!this.props.classicRepositoryLayout}
+        wipOptions={this.wipOptions}
+        hideWhitespaceInChangesDiff={this.props.hideWhitespaceInChangesDiff}
+        showDiffCheckMarks={this.props.showDiffCheckMarks}
+        askForConfirmationOnDiscardChanges={
+          this.props.askForConfirmationOnDiscardChanges
+        }
       />
     )
+  }
+
+  private get wipOptions(): IWipCommitOptions {
+    const { props } = this
+    return {
+      issuesStore: props.issuesStore,
+      gitHubUserStore: props.gitHubUserStore,
+      focusCommitMessage: props.focusCommitMessage,
+      isShowingModal: props.isShowingModal,
+      isShowingFoldout: props.isShowingFoldout,
+      commitSpellcheckEnabled: props.commitSpellcheckEnabled,
+      showCommitLengthWarning: props.showCommitLengthWarning,
+      shouldShowGenerateCommitMessageCallOut:
+        props.shouldShowGenerateCommitMessageCallOut,
+      skipCommitHooks: props.skipCommitHooks,
+      signOffCommits: props.signOffCommits,
+      allowEmptyCommit: props.allowEmptyCommit,
+      onShowCommitProgress: props.state.subscribeToCommitOutput
+        ? this.onShowCommitProgress
+        : undefined,
+      onUpdateCommitOptions: props.onUpdateCommitOptions,
+    }
   }
 
   private onDiffOptionsOpened = () => {
@@ -623,7 +659,9 @@ export class RepositoryView extends React.Component<
 
   private renderContent(): JSX.Element | null {
     const selectedSection = this.props.state.selectedSection
-    if (selectedSection === RepositorySectionTab.Changes) {
+    if (!this.props.classicRepositoryLayout) {
+      return this.renderContentForHistory()
+    } else if (selectedSection === RepositorySectionTab.Changes) {
       return this.renderContentForChanges()
     } else if (selectedSection === RepositorySectionTab.History) {
       return this.renderContentForHistory()

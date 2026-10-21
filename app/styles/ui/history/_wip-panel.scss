@@ -1,0 +1,221 @@
+.gk-theme {
+  .wip-button {
+    height: 20px;
+    padding: 0 8px;
+    border: 1px solid var(--gk-border);
+    border-radius: 3px;
+    background: var(--gk-panel-bg1);
+    color: var(--gk-text);
+    font-size: 11px;
+    white-space: nowrap;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--gk-panel-bg2);
+      color: var(--gk-text-bright);
+    }
+
+    &.stage {
+      border-color: var(--gk-green);
+      background: var(--gk-green);
+      color: var(--background-color);
+
+      &:hover:not(:disabled) {
+        background: var(--gk-green);
+        color: var(--background-color);
+        filter: brightness(1.1);
+      }
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+  }
+
+  .wip-diff-side {
+    flex-shrink: 0;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+
+    &.unstaged {
+      color: var(--gk-orange);
+      background: gk-tint(var(--gk-orange), 20%);
+    }
+
+    &.staged {
+      color: var(--gk-green);
+      background: gk-tint(var(--gk-green), 20%);
+    }
+  }
+}
+
+#history-graph-view .working-file-diff .center-diff-header {
+  > .header {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .wip-button {
+    flex-shrink: 0;
+    border: 1px solid var(--gk-border);
+    background: var(--gk-panel-bg1);
+    color: var(--gk-text);
+
+    &.stage {
+      border-color: var(--gk-green);
+      background: var(--gk-green);
+      color: var(--background-color);
+    }
+  }
+}
+
+.commit-details-panel.wip-panel {
+  .wip-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--gk-border);
+    color: var(--gk-text);
+    flex-shrink: 0;
+
+    .octicon {
+      width: 12px;
+      height: 12px;
+      color: var(--gk-text-secondary);
+    }
+  }
+
+  .wip-branch {
+    color: var(--gk-text-bright);
+    font-weight: 600;
+  }
+
+  .wip-section {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 60px;
+    border-bottom: 1px solid var(--gk-border);
+  }
+
+  .wip-section-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px 6px 12px;
+    background: var(--gk-panel-bg1);
+    flex-shrink: 0;
+  }
+
+  .wip-section-icon {
+    width: 12px;
+    height: 12px;
+    color: var(--gk-orange);
+  }
+
+  .wip-section.staged .wip-section-icon {
+    color: var(--gk-green);
+  }
+
+  .wip-section-title {
+    flex: 1 1 auto;
+    color: var(--gk-text-bright);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .wip-section-actions {
+    display: flex;
+    gap: 4px;
+  }
+
+  .wip-files {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .wip-empty {
+    padding: 8px 12px;
+    color: var(--gk-text-disabled);
+  }
+
+  .wip-file {
+    padding-right: 4px;
+
+    &:hover {
+      background: var(--gk-hover-row);
+
+      .wip-file-action {
+        visibility: visible;
+      }
+    }
+
+    &.selected {
+      background: var(--gk-selected-row);
+    }
+  }
+
+  .wip-file-main {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    padding: 0 0 0 12px;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .wip-file-action {
+    visibility: hidden;
+    flex-shrink: 0;
+    height: 18px;
+    padding: 0 6px;
+    border: none;
+    border-radius: 3px;
+    background: var(--gk-green);
+    color: var(--background-color);
+    font-size: 11px;
+    cursor: pointer;
+
+    &.unstage {
+      background: var(--gk-red);
+    }
+  }
+
+  .wip-commit {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    padding-top: 6px;
+
+    .commit-message-component {
+      border-top: none;
+    }
+  }
+
+  .wip-commit-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+  }
+
+  .wip-amend {
+    margin: 0;
+    color: var(--gk-text-secondary);
+    font-size: 11px;
+  }
+}

@@ -4,7 +4,11 @@ import { Branch, BranchType } from '../../models/branch'
 import { Commit, CommitOneLine } from '../../models/commit'
 import { IRemote } from '../../models/remote'
 import { IGraphStash } from '../../models/stash-entry'
-import { CommittedFileChange } from '../../models/status'
+import {
+  AppFileStatusKind,
+  CommittedFileChange,
+  WorkingDirectoryFileChange,
+} from '../../models/status'
 import { TipState } from '../../models/tip'
 import { PopupType } from '../../models/popup'
 import { FetchType } from '../../models/fetch'
@@ -38,6 +42,7 @@ import {
 } from './graph-model'
 import { graphViewStore } from './graph-view-store'
 import * as actions from './graph-git-actions'
+import * as wip from './wip-actions'
 import { RefPanelSection } from './ref-panel'
 
 /** Everything the graph's context menus need from the repository view. */
@@ -46,6 +51,7 @@ export interface IGraphMenuContext {
   readonly dispatcher: Dispatcher
   readonly state: IRepositoryState
   readonly askForConfirmationOnCheckoutCommit: boolean
+  readonly askForConfirmationOnDiscardChanges: boolean
   readonly externalEditorLabel?: string
   readonly onCherryPick: (
     repository: Repository,
@@ -129,6 +135,20 @@ export class GraphMenus {
   private run(fn: () => Promise<unknown>) {
     const { dispatcher, repository } = this.ctx
     return actions.runGraphAction(dispatcher, repository, fn)
+  }
+
+  public stashChanges() {
+    const { repository } = this.ctx
+    return this.run(() => actions.stashAllChanges(repository))
+  }
+
+  public popLatestStash() {
+    const { repository, state } = this.ctx
+    const latest = state.graphStashes[0]
+    if (latest === undefined) {
+      return
+    }
+    return this.run(() => actions.popStashUnstaged(repository, latest.name))
   }
 
   private confirm(message: string) {
@@ -1003,6 +1023,16 @@ export class GraphMenus {
           ),
       },
       {
+        label: t('Stage All Changes', 'Stage all changes'),
+        enabled: files.length > 0,
+        action: () => wip.stageAll(dispatcher, repository),
+      },
+      {
+        label: t('Unstage All Changes', 'Unstage all changes'),
+        enabled: files.length > 0,
+        action: () => wip.unstageAll(dispatcher, repository),
+      },
+      {
         label: t('Stash All Changes', 'Stash all changes'),
         enabled: files.length > 0 && this.currentBranch !== null,
         action: () => dispatcher.createStashForCurrentBranch(repository),
@@ -1011,14 +1041,7 @@ export class GraphMenus {
       {
         label: t('Discard All Changes…', 'Discard all changes…'),
         enabled: files.length > 0,
-        action: () =>
-          dispatcher.showPopup({
-            type: PopupType.ConfirmDiscardChanges,
-            repository,
-            files,
-            showDiscardChangesSetting: false,
-            discardingAllChanges: true,
-          }),
+        action: () => this.discardFiles(files, true),
       },
     ])
   }
@@ -1251,6 +1274,110 @@ export class GraphMenus {
       })
     }
     show(items)
+  }
+
+  /**
+   * The menu of a file in the WIP panel's Unstaged or Staged list.
+   *
+   * @param onOpenMergeTool Opens the file in the merge tool, when it has
+   *                        conflicts that can be merged there.
+   */
+  public async showWorkingFileMenu(
+    file: WorkingDirectoryFileChange,
+    staged: boolean,
+    onOpenMergeTool: (() => void) | null
+  ) {
+    const { repository, dispatcher, externalEditorLabel } = this.ctx
+    const fullPath = Path.join(repository.path, file.path)
+    const exists = await pathExists(fullPath)
+    const extension = Path.extname(file.path)
+    const isUntracked = file.status.kind === AppFileStatusKind.Untracked
+
+    show([
+      staged
+        ? {
+            label: t('Unstage File', 'Unstage file'),
+            action: () => wip.unstageFiles(dispatcher, repository, [file]),
+          }
+        : {
+            label: t('Stage File', 'Stage file'),
+            action: () => wip.stageFiles(dispatcher, repository, [file]),
+          },
+      ...(onOpenMergeTool !== null
+        ? [
+            {
+              label: t('Open in Merge Tool', 'Open in merge tool'),
+              action: onOpenMergeTool,
+            },
+          ]
+        : []),
+      {
+        label: t('Discard Changes…', 'Discard changes…'),
+        action: () => this.discardFiles([file]),
+      },
+      separator,
+      {
+        label: t('Ignore File', 'Ignore file'),
+        enabled: isUntracked,
+        action: () => dispatcher.appendIgnoreFile(repository, file.path),
+      },
+      ...(extension.length > 0
+        ? [
+            {
+              label: t(
+                `Ignore All *${extension} Files`,
+                `Ignore all *${extension} files`
+              ),
+              enabled: isUntracked,
+              action: () =>
+                dispatcher.appendIgnoreRule(repository, `*${extension}`),
+            },
+          ]
+        : []),
+      separator,
+      {
+        label: RevealInFileManagerLabel,
+        action: () => revealInFileManager(repository, file.path),
+        enabled: exists,
+      },
+      {
+        label: externalEditorLabel
+          ? `Open in ${externalEditorLabel}`
+          : DefaultEditorLabel,
+        action: () => this.ctx.onOpenInExternalEditor(file.path),
+        enabled: exists,
+      },
+      {
+        label: OpenWithDefaultProgramLabel,
+        action: () => openFile(fullPath, dispatcher),
+        enabled: exists && isSafeFileExtension(extension),
+      },
+      separator,
+      { label: CopyFilePathLabel, action: () => writeClipboardText(fullPath) },
+      {
+        label: CopyRelativeFilePathLabel,
+        action: () => writeClipboardText(Path.normalize(file.path)),
+      },
+    ])
+  }
+
+  /** Discard the files' changes, asking first if the user wants to be asked. */
+  public discardFiles(
+    files: ReadonlyArray<WorkingDirectoryFileChange>,
+    discardingAllChanges: boolean = false
+  ) {
+    const { repository, dispatcher, askForConfirmationOnDiscardChanges } =
+      this.ctx
+    if (!askForConfirmationOnDiscardChanges && !discardingAllChanges) {
+      return dispatcher.discardChanges(repository, files)
+    }
+    return dispatcher.showPopup({
+      type: PopupType.ConfirmDiscardChanges,
+      repository,
+      files,
+      showDiscardChangesSetting: !discardingAllChanges,
+      discardingAllChanges,
+    })
   }
 
   /** Every ref the graph knows about, used to resolve panel selections. */

@@ -345,6 +345,7 @@ import {
   getUntrackedFiles,
   hasUnresolvedConflicts,
 } from '../status'
+import { hasStagedChanges } from '../staging'
 import { isBranchPushable } from '../helpers/push-control'
 import {
   findAssociatedPullRequest,
@@ -571,6 +572,8 @@ export const underlineLinksDefault = true
 export const showDiffCheckMarksDefault = true
 export const showDiffCheckMarksKey = 'diff-check-marks-visible'
 
+const classicRepositoryLayoutKey = 'classic-repository-layout'
+
 const alwaysShowWorktreeListKey = 'always-show-worktree-list'
 
 const commitMessageGenerationDisclaimerLastSeenKey =
@@ -748,6 +751,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
     | undefined = undefined
 
   private showDiffCheckMarks: boolean = showDiffCheckMarksDefault
+  private classicRepositoryLayout: boolean = false
   private alwaysShowWorktreeList: boolean = false
 
   private preferAbsoluteDates: boolean = false
@@ -1354,6 +1358,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       cachedRepoRulesets: this.cachedRepoRulesets,
       underlineLinks: this.underlineLinks,
       showDiffCheckMarks: this.showDiffCheckMarks,
+      classicRepositoryLayout: this.classicRepositoryLayout,
       alwaysShowWorktreeList: this.alwaysShowWorktreeList,
       preferAbsoluteDates: this.preferAbsoluteDates,
       updateState: updateStore.state,
@@ -2664,6 +2669,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
       showDiffCheckMarksDefault
     )
 
+    this.classicRepositoryLayout = getBoolean(classicRepositoryLayoutKey, false)
+
     this.preferAbsoluteDates = getPreferAbsoluteDates()
 
     this.commitMessageGenerationDisclaimerLastSeen =
@@ -3731,9 +3738,12 @@ export class AppStore extends TypedBaseStore<IAppState> {
   ): Promise<boolean> {
     const state = this.repositoryStateCache.get(repository)
     const files = state.changesState.workingDirectory.files
-    const selectedFiles = files.filter(file => {
-      return file.selection.getSelectionType() !== DiffSelectionType.None
-    })
+    const commitIndex = !this.classicRepositoryLayout
+    const selectedFiles = commitIndex
+      ? files.filter(hasStagedChanges)
+      : files.filter(file => {
+          return file.selection.getSelectionType() !== DiffSelectionType.None
+        })
 
     const gitStore = this.gitStoreCache.get(repository)
 
@@ -3755,6 +3765,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
             noVerify: state.skipCommitHooks,
             signOff: state.signOffCommits,
             allowEmpty: state.allowEmptyCommit,
+            commitIndex,
           }).catch(err => (aborted ? undefined : Promise.reject(err)))
         },
         { gitContext: { kind: 'commit' }, repository }
@@ -10433,6 +10444,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
     if (showDiffCheckMarks !== this.showDiffCheckMarks) {
       this.showDiffCheckMarks = showDiffCheckMarks
       setBoolean(showDiffCheckMarksKey, showDiffCheckMarks)
+      this.emitUpdate()
+    }
+  }
+
+  /** This shouldn't be called directly. See 'Dispatcher'. */
+  public _setClassicRepositoryLayout(classic: boolean) {
+    if (classic !== this.classicRepositoryLayout) {
+      this.classicRepositoryLayout = classic
+      setBoolean(classicRepositoryLayoutKey, classic)
       this.emitUpdate()
     }
   }

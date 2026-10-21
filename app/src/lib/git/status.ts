@@ -9,6 +9,7 @@ import {
   UnmergedEntry,
   ConflictedFileStatus,
   UnmergedEntrySummary,
+  IStagingStatus,
 } from '../../models/status'
 import {
   parsePorcelainStatus,
@@ -126,6 +127,16 @@ function parseConflictedState(
   }
 }
 
+function getStagingStatus(entry: {
+  readonly index?: GitStatusEntry
+  readonly workingTree?: GitStatusEntry
+}): IStagingStatus | undefined {
+  if (entry.index === undefined || entry.workingTree === undefined) {
+    return undefined
+  }
+  return { index: entry.index, workingTree: entry.workingTree }
+}
+
 function convertToAppStatus(
   path: string,
   entry: FileEntry,
@@ -133,21 +144,25 @@ function convertToAppStatus(
   oldPath?: string
 ): AppFileStatus {
   if (entry.kind === 'ordinary') {
+    const staging = getStagingStatus(entry)
     switch (entry.type) {
       case 'added':
         return {
           kind: AppFileStatusKind.New,
           submoduleStatus: entry.submoduleStatus,
+          staging,
         }
       case 'modified':
         return {
           kind: AppFileStatusKind.Modified,
           submoduleStatus: entry.submoduleStatus,
+          staging,
         }
       case 'deleted':
         return {
           kind: AppFileStatusKind.Deleted,
           submoduleStatus: entry.submoduleStatus,
+          staging,
         }
     }
   } else if (entry.kind === 'copied' && oldPath != null) {
@@ -156,12 +171,14 @@ function convertToAppStatus(
       oldPath,
       submoduleStatus: entry.submoduleStatus,
       renameIncludesModifications: false,
+      staging: getStagingStatus(entry),
     }
   } else if (entry.kind === 'renamed' && oldPath != null) {
     return {
       kind: AppFileStatusKind.Renamed,
       oldPath,
       submoduleStatus: entry.submoduleStatus,
+      staging: getStagingStatus(entry),
       renameIncludesModifications:
         entry.workingTree === GitStatusEntry.Modified ||
         (entry.renameOrCopyScore !== undefined &&
