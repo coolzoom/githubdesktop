@@ -90,7 +90,12 @@ import { formatCommitMessage } from '../format-commit-message'
 import { GitAuthor } from '../../models/git-author'
 import { BaseStore } from './base-store'
 import { getStashes, getStashedFiles } from '../git/stash'
-import { IStashEntry, StashedChangesLoadStates } from '../../models/stash-entry'
+import { getGraphCommits, getGraphStashes, getStashCommits } from '../git/graph'
+import {
+  IGraphStash,
+  IStashEntry,
+  StashedChangesLoadStates,
+} from '../../models/stash-entry'
 import { PullRequest } from '../../models/pull-request'
 import { IStatsStore } from '../stats'
 import { getTagsToPush, storeTagsToPush } from './helpers/tags-to-push-storage'
@@ -102,6 +107,9 @@ import { findDefaultBranch } from '../find-default-branch'
 
 /** The number of commits to load from history per batch. */
 const CommitBatchSize = 100
+
+/** The number of commits to load per batch for the commit graph. */
+const GraphCommitBatchSize = 300
 
 const LoadingHistoryRequestKey = 'history'
 
@@ -156,6 +164,8 @@ export class GitStore extends BaseStore {
   private _desktopStashEntries = new Map<string, IStashEntry>()
 
   private _stashEntryCount = 0
+
+  private _graphStashes: ReadonlyArray<IGraphStash> = []
 
   public constructor(
     private readonly repository: Repository,
@@ -236,6 +246,55 @@ export class GitStore extends BaseStore {
 
     this.storeCommits(commits)
     return commits.map(c => c.sha)
+  }
+
+  /**
+   * Load a batch of commits reachable from any branch, remote branch, tag or
+   * HEAD, for the commit graph.
+   */
+  public async loadGraphCommitBatch(skip: number) {
+    const requestKey = `history/graph/skip/${skip}`
+    if (this.requestsInFight.has(requestKey)) {
+      return null
+    }
+
+    this.requestsInFight.add(requestKey)
+
+    const commits = await this.performFailableOperation(() =>
+      getGraphCommits(this.repository, GraphCommitBatchSize, skip)
+    )
+
+    this.requestsInFight.delete(requestKey)
+    if (!commits) {
+      return null
+    }
+
+    this.storeCommits(commits)
+    return commits.map(c => c.sha)
+  }
+
+  /** Every stash entry in the repository, newest first. */
+  public get graphStashes(): ReadonlyArray<IGraphStash> {
+    return this._graphStashes
+  }
+
+  private async loadGraphStashes() {
+    const stashes = await this.performFailableOperation(() =>
+      getGraphStashes(this.repository)
+    )
+    if (stashes === undefined) {
+      return
+    }
+
+    const missing = stashes.filter(s => !this.commitLookup.has(s.sha))
+    const commits = await this.performFailableOperation(() =>
+      getStashCommits(this.repository, missing)
+    )
+    if (commits !== undefined) {
+      this.storeCommits(commits)
+    }
+
+    this._graphStashes = stashes.filter(s => this.commitLookup.has(s.sha))
   }
 
   public async refreshTags() {
@@ -1215,6 +1274,7 @@ export class GitStore extends BaseStore {
 
     this._desktopStashEntries = map
     this._stashEntryCount = stash.stashEntryCount
+    await this.loadGraphStashes()
     this.emitUpdate()
 
     this.loadFilesForCurrentStashEntry()

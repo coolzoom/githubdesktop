@@ -17,6 +17,15 @@ export interface IStashEntry {
   readonly parents: ReadonlyArray<string>
 }
 
+/** A stash entry as shown in the commit graph, regardless of who created it. */
+export interface IGraphStash {
+  /** The reflog selector, e.g. `stash@{0}` */
+  readonly name: string
+  readonly sha: string
+  readonly parents: ReadonlyArray<string>
+  readonly message: string
+}
+
 /** Whether file changes for a stash entry are loaded or not */
 export enum StashedChangesLoadStates {
   NotLoaded = 'NotLoaded',

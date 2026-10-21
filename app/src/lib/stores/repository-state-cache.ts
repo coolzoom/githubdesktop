@@ -425,6 +425,8 @@ function getInitialRepositoryState(): IRepositoryState {
     commitLookup: new Map<string, Commit>(),
     localCommitSHAs: [],
     localTags: null,
+    graphStashes: [],
+    remotes: [],
     tagsToPush: null,
     aheadBehind: null,
     remote: null,

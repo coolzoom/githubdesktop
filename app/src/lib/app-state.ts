@@ -49,7 +49,7 @@ import { ApplicableTheme, ApplicationTheme } from '../ui/lib/application-theme'
 import { IAccountRepositories } from './stores/api-repositories-store'
 import { ManualConflictResolution } from '../models/manual-conflict-resolution'
 import { Banner } from '../models/banner'
-import { IStashEntry } from '../models/stash-entry'
+import { IGraphStash, IStashEntry } from '../models/stash-entry'
 import { TutorialStep } from '../models/tutorial-step'
 import { UncommittedChangesStrategy } from '../models/uncommitted-changes-strategy'
 import { DragElement } from '../models/drag-drop'
@@ -640,6 +640,12 @@ export interface IRepositoryState {
   readonly revertProgress: IRevertProgress | null
 
   readonly localTags: Map<string, string> | null
+
+  /** Every stash entry in the repository, newest first, for the commit graph. */
+  readonly graphStashes: ReadonlyArray<IGraphStash>
+
+  /** All remotes configured in the repository. */
+  readonly remotes: ReadonlyArray<IRemote>
 
   /** Undo state associated with a multi commit operation operation */
   readonly multiCommitOperationUndoState: IMultiCommitOperationUndoState | null

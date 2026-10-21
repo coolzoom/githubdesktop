@@ -1,13 +1,22 @@
 import * as React from 'react'
 import { Repository } from '../models/repository'
-import { Commit, CommitOneLine } from '../models/commit'
+import { CommitOneLine } from '../models/commit'
 import { TipState } from '../models/tip'
 import { UiView } from './ui-view'
 import { Changes, ChangesSidebar } from './changes'
 import { NoChanges } from './changes/no-changes'
 import { MultipleSelection } from './changes/multiple-selection'
 import { FilesChangedBadge } from './changes/files-changed-badge'
-import { SelectedCommits, CompareSidebar } from './history'
+import { RefPanel, RefPanelSection } from './history-graph/ref-panel'
+import {
+  HistoryGraphView,
+  primaryRef,
+} from './history-graph/history-graph-view'
+import { GraphMenus, IGraphMenuContext } from './history-graph/graph-menus'
+import { IGraphRef, IGraphRefGroup } from './history-graph/graph-model'
+import { graphViewStore } from './history-graph/graph-view-store'
+import { IRemote } from '../models/remote'
+import { IGraphStash } from '../models/stash-entry'
 import { Resizable } from './resizable'
 import { TabBar } from './tab-bar'
 import {
@@ -29,9 +38,6 @@ import { StashedChangesLoadStates } from '../models/stash-entry'
 import { TutorialPanel, TutorialWelcome, TutorialDone } from './tutorial'
 import { TutorialStep, isValidTutorialStep } from '../models/tutorial-step'
 import { openFile } from './lib/open-file'
-import { AheadBehindStore } from '../lib/stores/ahead-behind-store'
-import { dragAndDropManager } from '../lib/drag-and-drop-manager'
-import { DragType } from '../models/drag-drop'
 import { PullRequestSuggestedNextAction } from '../models/pull-request'
 import { clamp } from '../lib/clamp'
 import { Emoji } from '../lib/emoji'
@@ -43,7 +49,6 @@ interface IRepositoryViewProps {
   readonly dispatcher: Dispatcher
   readonly emoji: Map<string, Emoji>
   readonly sidebarWidth: IConstrainedValue
-  readonly commitSummaryWidth: IConstrainedValue
   readonly stashedFilesWidth: IConstrainedValue
   readonly issuesStore: IssuesStore
   readonly gitHubUserStore: GitHubUserStore
@@ -53,7 +58,6 @@ interface IRepositoryViewProps {
   readonly hideWhitespaceInHistoryDiff: boolean
   readonly showSideBySideDiff: boolean
   readonly showDiffCheckMarks: boolean
-  readonly preferAbsoluteDates: boolean
   readonly askForConfirmationOnDiscardChanges: boolean
   readonly askForConfirmationOnCommitFilteredChanges: boolean
   readonly askForConfirmationOnDiscardStash: boolean
@@ -105,7 +109,6 @@ interface IRepositoryViewProps {
   readonly currentTutorialStep: TutorialStep
 
   readonly onExitTutorial: () => void
-  readonly aheadBehindStore: AheadBehindStore
   readonly onCherryPick: (
     repository: Repository,
     commits: ReadonlyArray<CommitOneLine>
@@ -145,7 +148,6 @@ interface IRepositoryViewProps {
 
 interface IRepositoryViewState {
   readonly changesListScrollTop: number
-  readonly compareListScrollTop: number
 }
 
 const enum Tab {
@@ -160,22 +162,30 @@ export class RepositoryView extends React.Component<
   private previousSection: RepositorySectionTab =
     this.props.state.selectedSection
 
-  // Flag to force the app to use the scroll position in the state the next time
-  // the Compare list is rendered.
-  private forceCompareListScrollTop: boolean = false
-
   private readonly changesSidebarRef = React.createRef<ChangesSidebar>()
-  private readonly compareSidebarRef = React.createRef<CompareSidebar>()
 
   private focusHistoryNeeded: boolean = false
   private focusChangesNeeded: boolean = false
+
+  private readonly graphMenus = new GraphMenus(
+    (): IGraphMenuContext => ({
+      repository: this.props.repository,
+      dispatcher: this.props.dispatcher,
+      state: this.props.state,
+      askForConfirmationOnCheckoutCommit:
+        this.props.askForConfirmationOnCheckoutCommit,
+      externalEditorLabel: this.props.externalEditorLabel,
+      onCherryPick: this.props.onCherryPick,
+      onViewCommitOnGitHub: this.props.onViewCommitOnGitHub,
+      onOpenInExternalEditor: this.props.onOpenInExternalEditor,
+    })
+  )
 
   public constructor(props: IRepositoryViewProps) {
     super(props)
 
     this.state = {
       changesListScrollTop: 0,
-      compareListScrollTop: 0,
     }
   }
 
@@ -188,19 +198,14 @@ export class RepositoryView extends React.Component<
   }
 
   public scrollCompareListToTop(): void {
-    this.forceCompareListScrollTop = true
-
-    this.setState({
-      compareListScrollTop: 0,
-    })
+    const [first] = this.props.state.compareState.commitSHAs
+    if (first !== undefined) {
+      graphViewStore.requestScrollTo(first)
+    }
   }
 
   private onChangesListScrolled = (scrollTop: number) => {
     this.setState({ changesListScrollTop: scrollTop })
-  }
-
-  private onCompareListScrolled = (scrollTop: number) => {
-    this.setState({ compareListScrollTop: scrollTop })
   }
 
   private renderChangesBadge(): JSX.Element | null {
@@ -328,61 +333,66 @@ export class RepositoryView extends React.Component<
     )
   }
 
-  private renderCompareSidebar(): JSX.Element {
-    const { repository, dispatcher, state, aheadBehindStore, emoji } =
-      this.props
-    const {
-      remote,
-      compareState,
-      branchesState,
-      commitSelection: { shas },
-      commitLookup,
-      localCommitSHAs,
-      localTags,
-      tagsToPush,
-      multiCommitOperationState: mcos,
-    } = state
-    const { tip } = branchesState
-    const currentBranch = tip.kind === TipState.Valid ? tip.branch : null
-    const scrollTop =
-      this.forceCompareListScrollTop ||
-      this.previousSection === RepositorySectionTab.Changes
-        ? this.state.compareListScrollTop
-        : undefined
+  private renderRefPanel(): JSX.Element {
+    const { repository, state } = this.props
+    const { tip, allBranches } = state.branchesState
     this.previousSection = RepositorySectionTab.History
-    this.forceCompareListScrollTop = false
 
     return (
-      <CompareSidebar
-        ref={this.compareSidebarRef}
+      <RefPanel
         repository={repository}
-        isLocalRepository={remote === null}
-        compareState={compareState}
-        selectedCommitShas={shas}
-        shasToHighlight={compareState.shasToHighlight}
-        currentBranch={currentBranch}
-        emoji={emoji}
-        commitLookup={commitLookup}
-        localCommitSHAs={localCommitSHAs}
-        localTags={localTags}
-        dispatcher={dispatcher}
-        onRevertCommit={this.onRevertCommit}
-        onAmendCommit={this.onAmendCommit}
-        onViewCommitOnGitHub={this.props.onViewCommitOnGitHub}
-        onCompareListScrolled={this.onCompareListScrolled}
-        onCherryPick={this.props.onCherryPick}
-        compareListScrollTop={scrollTop}
-        tagsToPush={tagsToPush}
-        aheadBehindStore={aheadBehindStore}
-        isMultiCommitOperationInProgress={mcos !== null}
-        askForConfirmationOnCheckoutCommit={
-          this.props.askForConfirmationOnCheckoutCommit
-        }
-        accounts={this.props.accounts}
-        preferAbsoluteDates={this.props.preferAbsoluteDates}
+        branches={allBranches}
+        currentBranchName={tip.kind === TipState.Valid ? tip.branch.name : null}
+        remotes={state.remotes}
+        tags={state.localTags}
+        stashes={state.graphStashes}
+        onRefSelected={this.onRefSelected}
+        onRefDoubleClick={this.onRefDoubleClick}
+        onStashSelected={this.onStashSelected}
+        onRefContextMenu={this.onRefContextMenu}
+        onRemoteContextMenu={this.onRemoteContextMenu}
+        onStashContextMenu={this.onStashContextMenu}
+        onSectionContextMenu={this.onSectionContextMenu}
       />
     )
   }
+
+  /** Select a commit in the graph and scroll it into view. */
+  private selectSha = (sha: string) => {
+    const { repository, dispatcher, state } = this.props
+    if (!state.compareState.commitSHAs.includes(sha)) {
+      return
+    }
+    dispatcher.changeCommitSelection(repository, [sha], true)
+    dispatcher.loadChangedFilesForCurrentSelection(repository)
+    graphViewStore.requestScrollTo(sha)
+  }
+
+  private onRefSelected = (ref: IGraphRef) => this.selectSha(ref.sha)
+
+  private onRefDoubleClick = (ref: IGraphRef) =>
+    this.graphMenus.checkoutRef(ref)
+
+  private onCheckoutRefGroup = (group: IGraphRefGroup) =>
+    this.graphMenus.checkoutRef(primaryRef(group))
+
+  private onStashSelected = (stash: IGraphStash) => this.selectSha(stash.sha)
+
+  private onRefContextMenu = (
+    ref: IGraphRef,
+    selected: ReadonlyArray<IGraphRef>
+  ) => this.graphMenus.showRefMenu(ref, selected)
+
+  private onRemoteContextMenu = (remote: IRemote) =>
+    this.graphMenus.showRemoteMenu(remote)
+
+  private onStashContextMenu = (stash: IGraphStash) =>
+    this.graphMenus.showStashMenu(stash)
+
+  private onSectionContextMenu = (
+    section: RefPanelSection,
+    refs: ReadonlyArray<IGraphRef>
+  ) => this.graphMenus.showSectionMenu(section, refs)
 
   private renderSidebarContents(): JSX.Element {
     const selectedSection = this.props.state.selectedSection
@@ -390,7 +400,7 @@ export class RepositoryView extends React.Component<
     if (selectedSection === RepositorySectionTab.Changes) {
       return this.renderChangesSidebar()
     } else if (selectedSection === RepositorySectionTab.History) {
-      return this.renderCompareSidebar()
+      return this.renderRefPanel()
     } else {
       return assertNever(selectedSection, 'Unknown repository section')
     }
@@ -476,47 +486,24 @@ export class RepositoryView extends React.Component<
   }
 
   private renderContentForHistory(): JSX.Element {
-    const { commitSelection, commitLookup, localCommitSHAs } = this.props.state
-    const { changesetData, file, diff, shas, shasInDiff, isContiguous } =
-      commitSelection
-
-    const selectedCommits = []
-    for (const sha of shas) {
-      const commit = commitLookup.get(sha)
-      if (commit !== undefined) {
-        selectedCommits.push(commit)
-      }
-    }
-
-    const showDragOverlay = dragAndDropManager.isDragOfTypeInProgress(
-      DragType.Commit
-    )
-
     return (
-      <SelectedCommits
+      <HistoryGraphView
         repository={this.props.repository}
         dispatcher={this.props.dispatcher}
-        selectedCommits={selectedCommits}
-        shasInDiff={shasInDiff}
-        isContiguous={isContiguous}
-        localCommitSHAs={localCommitSHAs}
-        changesetData={changesetData}
-        selectedFile={file}
-        currentDiff={diff}
+        state={this.props.state}
+        menus={this.graphMenus}
         emoji={this.props.emoji}
-        commitSummaryWidth={this.props.commitSummaryWidth}
-        selectedDiffType={this.props.imageDiffType}
-        externalEditorLabel={this.props.externalEditorLabel}
-        onOpenInExternalEditor={this.props.onOpenInExternalEditor}
-        onViewCommitOnGitHub={this.props.onViewCommitOnGitHub}
+        accounts={this.props.accounts}
+        imageDiffType={this.props.imageDiffType}
         hideWhitespaceInDiff={this.props.hideWhitespaceInHistoryDiff}
         showSideBySideDiff={this.props.showSideBySideDiff}
         onOpenBinaryFile={this.onOpenBinaryFile}
         onOpenSubmodule={this.onOpenSubmodule}
         onChangeImageDiffType={this.onChangeImageDiffType}
         onDiffOptionsOpened={this.onDiffOptionsOpened}
-        showDragOverlay={showDragOverlay}
-        accounts={this.props.accounts}
+        onOpenInExternalEditor={this.props.onOpenInExternalEditor}
+        onSelectSha={this.selectSha}
+        onCheckoutRefGroup={this.onCheckoutRefGroup}
       />
     )
   }
@@ -652,18 +639,6 @@ export class RepositoryView extends React.Component<
     )
   }
 
-  private onRevertCommit = (commit: Commit) => {
-    this.props.dispatcher.revertCommit(this.props.repository, commit)
-  }
-
-  private onAmendCommit = (commit: Commit, isLocalCommit: boolean) => {
-    this.props.dispatcher.startAmendingRepository(
-      this.props.repository,
-      commit,
-      isLocalCommit
-    )
-  }
-
   public componentDidMount() {
     window.addEventListener('keydown', this.onGlobalKeyDown)
   }
@@ -680,7 +655,9 @@ export class RepositoryView extends React.Component<
 
     if (this.focusHistoryNeeded) {
       this.focusHistoryNeeded = false
-      this.compareSidebarRef.current?.focusHistory()
+      document
+        .querySelector<HTMLElement>('#history-graph-view .graph-rows .list')
+        ?.focus()
     }
   }
 

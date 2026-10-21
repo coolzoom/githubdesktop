@@ -306,6 +306,7 @@ import {
 } from './updates/changes-state'
 import { ManualConflictResolution } from '../../models/manual-conflict-resolution'
 import { BranchPruner } from './helpers/branch-pruner'
+import { getGraphRefsKey, insertGraphStashes } from './helpers/graph-history'
 import {
   enableCopilotConflictResolution,
   enableCopilotAppHandoff,
@@ -1464,6 +1465,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
       commitLookup: gitStore.commitLookup,
       localCommitSHAs: gitStore.localCommitSHAs,
       localTags: gitStore.localTags,
+      graphStashes: gitStore.graphStashes,
+      remotes: gitStore.remotes,
       aheadBehind: gitStore.aheadBehind,
       tagsToPush: gitStore.tagsToPush,
       remote: gitStore.currentRemote,
@@ -1729,7 +1732,18 @@ export class AppStore extends TypedBaseStore<IAppState> {
     }
 
     if (selectedSHA === null && commitSHAs.length > 0) {
-      this._changeCommitSelection(repository, [commitSHAs[0]], true)
+      const { tip } = state.branchesState
+      const headSha =
+        tip.kind === TipState.Valid
+          ? tip.branch.tip.sha
+          : tip.kind === TipState.Detached
+          ? tip.currentSha
+          : null
+      const initialSHA =
+        headSha !== null && commitSHAs.includes(headSha)
+          ? headSha
+          : commitSHAs[0]
+      this._changeCommitSelection(repository, [initialSHA], true)
       this._loadChangedFilesForCurrentSelection(repository)
     }
   }
@@ -1798,10 +1812,20 @@ export class AppStore extends TypedBaseStore<IAppState> {
       const { formState, commitSHAs } = compareState
       const previousTip = compareState.tip
 
+      // The graph shows every branch, tag and stash, so the history has to be
+      // reloaded whenever any of them move, not only HEAD.
+      const refsKey =
+        currentSha === null
+          ? null
+          : getGraphRefsKey(
+              currentSha,
+              gitStore.allBranches,
+              gitStore.localTags,
+              gitStore.graphStashes
+            )
+
       const tipIsUnchanged =
-        currentSha !== null &&
-        previousTip !== null &&
-        currentSha === previousTip
+        refsKey !== null && previousTip !== null && refsKey === previousTip
 
       if (
         tipIsUnchanged &&
@@ -1813,19 +1837,25 @@ export class AppStore extends TypedBaseStore<IAppState> {
         return
       }
 
-      // load initial group of commits for current branch
-      const commits = await gitStore.loadCommitBatch('HEAD', 0)
+      // load initial group of commits for all refs
+      const loaded = await gitStore.loadGraphCommitBatch(0)
 
-      if (commits === null) {
+      if (loaded === null) {
         return
       }
+
+      const commits = insertGraphStashes(
+        loaded,
+        gitStore.graphStashes,
+        gitStore.commitLookup
+      )
 
       const newState: IDisplayHistory = {
         kind: HistoryTabMode.History,
       }
 
       this.repositoryStateCache.updateCompareState(repository, () => ({
-        tip: currentSha,
+        tip: refsKey,
         formState: newState,
         commitSHAs: commits,
         filterText: '',
@@ -1968,31 +1998,25 @@ export class AppStore extends TypedBaseStore<IAppState> {
     const state = this.repositoryStateCache.get(repository)
     const { formState } = state.compareState
     if (formState.kind === HistoryTabMode.History) {
-      const commits = state.compareState.commitSHAs
+      const stashShas = new Set(gitStore.graphStashes.map(s => s.sha))
+      const commits = state.compareState.commitSHAs.filter(
+        sha => !stashShas.has(sha)
+      )
 
-      const tip = state.branchesState.tip
-
-      let newCommits: string[] | null = null
-
-      // Prioritize pulling from the local commits if the last one we pulled is local
-      if (
-        commits.length > 0 &&
-        tip.kind === TipState.Valid &&
-        gitStore.localCommitSHAs.includes(commits[commits.length - 1])
-      ) {
-        newCommits = await gitStore.loadLocalCommits(tip.branch, commits.length)
-      }
+      const newCommits = await gitStore.loadGraphCommitBatch(commits.length)
 
       if (!newCommits || newCommits.length === 0) {
-        newCommits = await gitStore.loadCommitBatch('HEAD', commits.length)
-      }
-
-      if (!newCommits) {
         return
       }
 
+      const commitSHAs = insertGraphStashes(
+        commits.concat(newCommits),
+        gitStore.graphStashes,
+        gitStore.commitLookup
+      )
+
       this.repositoryStateCache.updateCompareState(repository, () => ({
-        commitSHAs: commits.concat(newCommits),
+        commitSHAs,
       }))
       this.emitUpdate()
     }
