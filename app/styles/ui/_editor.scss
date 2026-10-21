@@ -1,0 +1,344 @@
+// The built-in Monaco editor: its tabs in the center of the History view, the
+// file editor and the git change markers in its gutter.
+
+#history-graph-view {
+  .history-graph-tab-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .diff-style-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
+
+.editor-tabs {
+  display: flex;
+  flex-shrink: 0;
+  height: 32px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--box-alt-background-color);
+  border-bottom: 1px solid var(--box-border-color);
+
+  &::-webkit-scrollbar {
+    height: 3px;
+  }
+
+  .editor-tab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    max-width: 220px;
+    border-right: 1px solid var(--box-border-color);
+    color: var(--text-secondary-color);
+
+    &.active {
+      background: var(--background-color);
+      color: var(--text-color);
+
+      &::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: 2px;
+        background: var(--tab-bar-active-color, var(--focus-color));
+      }
+    }
+
+    &.preview .name {
+      font-style: italic;
+    }
+
+    button {
+      border: none;
+      background: none;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .editor-tab-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      height: 100%;
+      padding: 0 4px 0 10px;
+      font-size: var(--font-size-sm);
+
+      .octicon {
+        flex-shrink: 0;
+        width: 12px;
+        height: 12px;
+      }
+
+      .name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .folder {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        opacity: 0.7;
+        font-size: var(--font-size-xs);
+      }
+    }
+
+    &.graph-tab .editor-tab-label {
+      padding-right: 12px;
+    }
+
+    .editor-tab-close {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      margin-right: 4px;
+      border-radius: 4px;
+
+      .octicon {
+        width: 12px;
+        height: 12px;
+        visibility: hidden;
+      }
+
+      .dirty-dot {
+        display: none;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+
+      &:hover {
+        background: var(--box-selected-background-color);
+      }
+    }
+
+    &.active .editor-tab-close .octicon,
+    &:hover .editor-tab-close .octicon,
+    .editor-tab-close:focus-visible .octicon {
+      visibility: visible;
+    }
+
+    &.dirty:not(:hover) .editor-tab-close {
+      .dirty-dot {
+        display: block;
+      }
+
+      .octicon {
+        display: none;
+      }
+    }
+  }
+}
+
+.code-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--background-color);
+
+  .code-editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    height: 30px;
+    padding: 0 8px 0 12px;
+    border-bottom: 1px solid var(--box-border-color);
+    font-size: var(--font-size-sm);
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 22px;
+      padding: 0 8px;
+      border: 1px solid var(--box-border-color);
+      border-radius: 4px;
+      background: none;
+      color: var(--text-secondary-color);
+      font-size: var(--font-size-sm);
+      cursor: pointer;
+
+      .octicon {
+        width: 12px;
+        height: 12px;
+      }
+
+      &:hover:not(:disabled) {
+        color: var(--text-color);
+        background: var(--box-alt-background-color);
+      }
+
+      &:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+    }
+  }
+
+  .code-editor-path {
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    color: var(--text-secondary-color);
+
+    .folder {
+      display: inline-flex;
+      align-items: center;
+
+      .octicon {
+        width: 10px;
+        height: 10px;
+        margin: 0 2px;
+      }
+    }
+
+    .file {
+      color: var(--text-color);
+    }
+  }
+
+  .code-editor-views {
+    display: flex;
+
+    button {
+      border-radius: 0;
+
+      &:first-child {
+        border-radius: 4px 0 0 4px;
+      }
+
+      &:last-child {
+        border-radius: 0 4px 4px 0;
+        margin-left: -1px;
+      }
+
+      &.selected {
+        color: var(--text-color);
+        background: var(--box-selected-background-color);
+      }
+    }
+  }
+
+  .code-editor-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--box-border-color);
+    background: var(--box-alt-background-color);
+    font-size: var(--font-size-sm);
+
+    &.warning .octicon {
+      color: var(--color-conflicted);
+    }
+
+    span {
+      flex: 1 1 auto;
+    }
+
+    button {
+      height: 22px;
+      padding: 0 10px;
+      border: 1px solid var(--box-border-color);
+      border-radius: 4px;
+      background: var(--background-color);
+      color: var(--text-color);
+      font-size: var(--font-size-sm);
+      cursor: pointer;
+    }
+  }
+
+  .code-editor-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .code-editor-unsupported {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex: 1 1 auto;
+    color: var(--text-secondary-color);
+  }
+}
+
+.monaco-editor-host,
+.monaco-diff-host {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+// VS Code's dirty diff markers, next to the line numbers.
+.monaco-editor .git-gutter {
+  cursor: pointer;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 3px;
+    width: 3px;
+    height: 100%;
+  }
+
+  &.git-gutter-added::before {
+    background: var(--color-new);
+  }
+
+  &.git-gutter-modified::before {
+    background: var(--color-modified);
+  }
+
+  &.git-gutter-deleted::before {
+    left: 1px;
+    bottom: -4px;
+    width: 0;
+    height: 0;
+    border: 4px solid transparent;
+    border-left-color: var(--color-deleted);
+  }
+
+  &.git-gutter-deleted.top::before {
+    top: -4px;
+    bottom: auto;
+  }
+
+  &:hover::before {
+    width: 5px;
+  }
+
+  &.git-gutter-deleted:hover::before {
+    width: 0;
+    border-width: 5px;
+  }
+}

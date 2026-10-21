@@ -1,6 +1,9 @@
 import * as React from 'react'
 import { Repository } from '../../models/repository'
-import { WorkingDirectoryFileChange } from '../../models/status'
+import {
+  AppFileStatusKind,
+  WorkingDirectoryFileChange,
+} from '../../models/status'
 import {
   DiffSelection,
   DiffType,
@@ -16,6 +19,12 @@ import { DiffHeader } from '../diff/diff-header'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import * as wip from './wip-actions'
+import { RepositoryEditors } from '../editor/editor-store'
+import {
+  DocumentDiff,
+  DiffRevision,
+  RevisionDiff,
+} from '../editor/revision-diff'
 
 interface IWorkingFileDiffProps {
   readonly repository: Repository
@@ -34,6 +43,11 @@ interface IWorkingFileDiffProps {
   readonly onOpenSubmodule: (fullPath: string) => void
   readonly onChangeImageDiffType: (type: ImageDiffType) => void
   readonly onDiffOptionsOpened: () => void
+  readonly editors: RepositoryEditors
+  /** Whether text diffs show in Monaco instead of the line staging view */
+  readonly useEditorDiff: boolean
+  /** Renders the button switching between the two diff styles */
+  readonly diffStyleToggle: React.ReactNode
   readonly onClose: () => void
 }
 
@@ -149,27 +163,90 @@ export class WorkingFileDiff extends React.Component<IWorkingFileDiffProps> {
           >
             {staged ? 'Unstage File' : 'Stage File'}
           </button>
+          {this.canUseEditorDiff && this.props.diffStyleToggle}
         </div>
-        <SeamlessDiffSwitcher
-          repository={this.props.repository}
-          imageDiffType={this.props.imageDiffType}
-          file={sideFile}
-          diff={diff}
-          readOnly={this.lineSelectionDisabled}
-          onIncludeChanged={this.onIncludeChanged}
-          onDiscardChanges={staged ? undefined : this.onDiscardChanges}
-          hideWhitespaceInDiff={this.props.hideWhitespaceInDiff}
-          showSideBySideDiff={this.props.showSideBySideDiff}
-          showDiffCheckMarks={this.props.showDiffCheckMarks}
-          askForConfirmationOnDiscardChanges={
-            this.props.askForConfirmationOnDiscardChanges
-          }
-          onOpenBinaryFile={this.props.onOpenBinaryFile}
-          onOpenSubmodule={this.props.onOpenSubmodule}
-          onChangeImageDiffType={this.props.onChangeImageDiffType}
-          onHideWhitespaceInDiffChanged={this.onHideWhitespaceInDiffChanged}
-        />
+        {this.canUseEditorDiff && this.props.useEditorDiff
+          ? this.renderEditorDiff()
+          : this.renderClassicDiff()}
       </div>
+    )
+  }
+
+  /** Monaco can show text diffs of files that exist on the side shown. */
+  private get canUseEditorDiff() {
+    const kind = this.sideFile.status.kind
+    return (
+      this.textDiff !== null &&
+      kind !== AppFileStatusKind.Conflicted &&
+      (this.props.staged || kind !== AppFileStatusKind.Deleted)
+    )
+  }
+
+  private renderEditorDiff() {
+    const { file, staged, editors } = this.props
+    const sideBySide = this.props.showSideBySideDiff
+    const ignoreTrimWhitespace = this.props.hideWhitespaceInDiff
+    if (!staged) {
+      return (
+        <DocumentDiff
+          editors={editors}
+          path={file.path}
+          sideBySide={sideBySide}
+          ignoreTrimWhitespace={ignoreTrimWhitespace}
+          fallback={this.renderClassicDiff()}
+        />
+      )
+    }
+    const { status } = this.sideFile
+    const headPath =
+      status.kind === AppFileStatusKind.Renamed ||
+      status.kind === AppFileStatusKind.Copied
+        ? status.oldPath
+        : file.path
+    const original: DiffRevision =
+      status.kind === AppFileStatusKind.New
+        ? { kind: 'empty' }
+        : { kind: 'commit', commitish: 'HEAD', path: headPath }
+    const modified: DiffRevision =
+      status.kind === AppFileStatusKind.Deleted
+        ? { kind: 'empty' }
+        : { kind: 'index', path: file.path }
+    return (
+      <RevisionDiff
+        repository={this.props.repository}
+        path={file.path}
+        original={original}
+        modified={modified}
+        refreshKey={file}
+        sideBySide={sideBySide}
+        ignoreTrimWhitespace={ignoreTrimWhitespace}
+      />
+    )
+  }
+
+  private renderClassicDiff() {
+    const { diff, staged } = this.props
+    const sideFile = this.sideFile
+    return (
+      <SeamlessDiffSwitcher
+        repository={this.props.repository}
+        imageDiffType={this.props.imageDiffType}
+        file={sideFile}
+        diff={diff}
+        readOnly={this.lineSelectionDisabled}
+        onIncludeChanged={this.onIncludeChanged}
+        onDiscardChanges={staged ? undefined : this.onDiscardChanges}
+        hideWhitespaceInDiff={this.props.hideWhitespaceInDiff}
+        showSideBySideDiff={this.props.showSideBySideDiff}
+        showDiffCheckMarks={this.props.showDiffCheckMarks}
+        askForConfirmationOnDiscardChanges={
+          this.props.askForConfirmationOnDiscardChanges
+        }
+        onOpenBinaryFile={this.props.onOpenBinaryFile}
+        onOpenSubmodule={this.props.onOpenSubmodule}
+        onChangeImageDiffType={this.props.onChangeImageDiffType}
+        onHideWhitespaceInDiffChanged={this.onHideWhitespaceInDiffChanged}
+      />
     )
   }
 }

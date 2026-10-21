@@ -87,6 +87,17 @@ export const renderer = merge(
           test: /\.cmd$/,
           type: 'asset/resource',
         },
+        {
+          test: /\.ttf$/,
+          type: 'asset/resource',
+        },
+        // Monaco's workers are built by the monacoWorkers config and created
+        // through MonacoEnvironment.getWorker, so don't bundle its own
+        // `new Worker(new URL(...))` references into the renderer.
+        {
+          test: /[\\/]node_modules[\\/]monaco-editor[\\/].*\.js$/,
+          parser: { worker: false, url: false },
+        },
       ],
     },
     plugins: [
@@ -146,6 +157,25 @@ export const cli = merge({}, commonConfig, {
       })
     ),
   ],
+})
+
+const monacoEsm = path.resolve(__dirname, 'node_modules/monaco-editor/esm/vs')
+
+/** The web workers of the built-in editor, see ui/editor/monaco.ts. */
+export const monacoWorkers = merge({}, commonConfig, {
+  entry: {
+    'editor.worker': path.join(monacoEsm, 'editor/editor.worker.js'),
+    'json.worker': path.join(monacoEsm, 'language/json/json.worker.js'),
+    'css.worker': path.join(monacoEsm, 'language/css/css.worker.js'),
+    'html.worker': path.join(monacoEsm, 'language/html/html.worker.js'),
+    'ts.worker': path.join(monacoEsm, 'language/typescript/ts.worker.js'),
+  },
+  output: {
+    filename: 'monaco/[name].js',
+    chunkFilename: 'monaco/[name].chunk.js',
+    library: { type: 'self', name: '[name]' },
+  },
+  target: 'webworker',
 })
 
 export const highlighter = merge({}, commonConfig, {

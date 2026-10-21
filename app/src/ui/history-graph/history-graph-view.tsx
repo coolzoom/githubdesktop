@@ -1,6 +1,6 @@
 import * as React from 'react'
 import memoizeOne from 'memoize-one'
-import { Disposable } from 'event-kit'
+import { CompositeDisposable, Disposable } from 'event-kit'
 import { Repository } from '../../models/repository'
 import { Branch } from '../../models/branch'
 import { Commit } from '../../models/commit'
@@ -47,7 +47,18 @@ import { MergeConflictEditor } from '../merge-conflict-editor/merge-conflict-edi
 import { IWipCommitOptions, IWipFileSelection, WipPanel } from './wip-panel'
 import { WorkingFileDiff } from './working-file-diff'
 import { TerminalPanel } from '../terminal-panel/terminal-panel'
-import { getNumber, setNumber } from '../../lib/local-storage'
+import {
+  getBoolean,
+  getNumber,
+  setBoolean,
+  setNumber,
+} from '../../lib/local-storage'
+import { getRepositoryEditors } from '../editor/editor-store'
+import { EditorTabs } from '../editor/editor-tabs'
+import { CodeEditor } from '../editor/code-editor'
+import { DiffRevision, RevisionDiff } from '../editor/revision-diff'
+import { AppFileStatusKind } from '../../models/status'
+import { DiffType } from '../../models/diff'
 
 const MinDetailsWidth = 240
 const MaxDetailsWidth = 700
@@ -85,6 +96,7 @@ interface IHistoryGraphViewProps {
   readonly onShowTerminalChanged: (show: boolean) => void
   /** Show the working directory diff of a file, e.g. picked in the explorer */
   readonly openWipFileRequest: IOpenWipFileRequest | null
+  readonly externalEditorLabel?: string
 }
 
 export interface IOpenWipFileRequest {
@@ -105,9 +117,14 @@ interface IHistoryGraphViewState {
   readonly wipFile: IWipFileSelection | null
   readonly wipDiff: IDiff | null
   readonly terminalHeight: number
+  /** Show text diffs in Monaco's diff editor instead of the line staging view */
+  readonly useEditorDiff: boolean
+  /** Bumped when the editor tabs change */
+  readonly editorsVersion: number
 }
 
 const terminalHeightKey = 'terminal-panel-height'
+const useEditorDiffKey = 'use-editor-diff'
 
 /**
  * The GitKraken-style History view: the commit graph in the center (or the
@@ -118,6 +135,7 @@ export class HistoryGraphView extends React.Component<
   IHistoryGraphViewState
 > {
   private subscription: Disposable | null = null
+  private editorsSubscription: Disposable | null = null
   private resizeStart: { x: number; width: number } | null = null
   private wipDiffFor: WorkingDirectoryFileChange | null = null
   private wipDiffStaged = false
@@ -186,6 +204,9 @@ export class HistoryGraphView extends React.Component<
       wipDiff: this.state?.wipDiff ?? null,
       terminalHeight:
         this.state?.terminalHeight ?? getNumber(terminalHeightKey, 240),
+      useEditorDiff:
+        this.state?.useEditorDiff ?? getBoolean(useEditorDiffKey, true),
+      editorsVersion: this.state?.editorsVersion ?? 0,
       settings: graphViewStore.getSettings(id),
       searchText: graphViewStore.getSearchText(id),
       detailsWidth: graphViewStore.columns.detailsWidth,
@@ -197,8 +218,40 @@ export class HistoryGraphView extends React.Component<
     this.subscription = graphViewStore.onDidUpdate(() =>
       this.setState(this.storeState())
     )
+    this.subscribeToEditors()
     this.initializeHistory()
     this.refreshTracking()
+  }
+
+  private get editors() {
+    return getRepositoryEditors(this.props.repository)
+  }
+
+  /** Re-render when tabs open, close or switch; tabs render the rest. */
+  private subscribeToEditors() {
+    this.editorsSubscription?.dispose()
+    const editors = this.editors
+    let tabs = editors.tabs
+    let activePath = editors.activePath
+    const subscription = new CompositeDisposable()
+    subscription.add(
+      editors.onDidChange(() => {
+        if (tabs !== editors.tabs || activePath !== editors.activePath) {
+          tabs = editors.tabs
+          activePath = editors.activePath
+          this.setState(s => ({ editorsVersion: s.editorsVersion + 1 }))
+        }
+      })
+    )
+    subscription.add(
+      editors.onDidSave(() =>
+        this.props.dispatcher.refreshStatus(this.props.repository)
+      )
+    )
+    subscription.add(
+      editors.onDidError(error => this.props.dispatcher.postError(error))
+    )
+    this.editorsSubscription = subscription
   }
 
   private initializeHistory() {
@@ -209,6 +262,7 @@ export class HistoryGraphView extends React.Component<
 
   public componentWillUnmount() {
     this.subscription?.dispose()
+    this.editorsSubscription?.dispose()
     this.stopResize()
   }
 
@@ -230,7 +284,14 @@ export class HistoryGraphView extends React.Component<
         wipFile: null,
         wipDiff: null,
       })
+      this.subscribeToEditors()
       this.initializeHistory()
+    }
+    if (
+      prevProps.state.changesState.workingDirectory !==
+      this.props.state.changesState.workingDirectory
+    ) {
+      this.editors.refresh()
     }
     if (
       prevProps.hideWhitespaceInChangesDiff !==
@@ -345,6 +406,7 @@ export class HistoryGraphView extends React.Component<
   }
 
   private onWipFileSelected = (selection: IWipFileSelection) => {
+    this.showGraph()
     const { wipFile } = this.state
     const isSame =
       wipFile?.path === selection.path && wipFile.staged === selection.staged
@@ -354,6 +416,13 @@ export class HistoryGraphView extends React.Component<
       isDiffOpen: false,
       mergeToolPath: null,
     })
+  }
+
+  /** Leave the editor tabs for the graph, e.g. once a commit is picked. */
+  private showGraph() {
+    if (this.editors.activePath !== null) {
+      this.editors.activate(null)
+    }
   }
 
   private refreshTracking() {
@@ -404,6 +473,7 @@ export class HistoryGraphView extends React.Component<
     shas: ReadonlyArray<string>,
     isContiguous: boolean
   ) => {
+    this.showGraph()
     const { dispatcher, repository, unifiedLayout, state } = this.props
     if (
       unifiedLayout &&
@@ -419,6 +489,7 @@ export class HistoryGraphView extends React.Component<
   }
 
   private onWorkDirSelected = () => {
+    this.showGraph()
     this.props.dispatcher.changeRepositorySection(
       this.props.repository,
       RepositorySectionTab.Changes
@@ -442,6 +513,7 @@ export class HistoryGraphView extends React.Component<
   }
 
   private onFileSelected = (file: CommittedFileChange) => {
+    this.showGraph()
     this.props.dispatcher.changeFileSelection(this.props.repository, file)
     this.setState({ isDiffOpen: true })
   }
@@ -520,6 +592,7 @@ export class HistoryGraphView extends React.Component<
     if (file === null) {
       return null
     }
+    const revisions = this.commitDiffRevisions
     return (
       <div className="center-diff">
         <div className="center-diff-header">
@@ -540,22 +613,103 @@ export class HistoryGraphView extends React.Component<
             onHideWhitespaceInDiffChanged={this.onHideWhitespaceInDiffChanged}
             onDiffOptionsOpened={this.props.onDiffOptionsOpened}
           />
+          {revisions !== null && this.renderDiffStyleToggle()}
         </div>
-        <SeamlessDiffSwitcher
-          repository={this.props.repository}
-          imageDiffType={this.props.imageDiffType}
-          file={file}
-          diff={diff}
-          readOnly={true}
-          hideWhitespaceInDiff={this.props.hideWhitespaceInDiff}
-          showDiffCheckMarks={false}
-          showSideBySideDiff={this.props.showSideBySideDiff}
-          onOpenBinaryFile={this.props.onOpenBinaryFile}
-          onChangeImageDiffType={this.props.onChangeImageDiffType}
-          onHideWhitespaceInDiffChanged={this.onHideWhitespaceInDiffChanged}
-          onOpenSubmodule={this.props.onOpenSubmodule}
-        />
+        {revisions !== null && this.state.useEditorDiff ? (
+          <RevisionDiff
+            repository={this.props.repository}
+            path={file.path}
+            original={revisions.original}
+            modified={revisions.modified}
+            sideBySide={this.props.showSideBySideDiff}
+            ignoreTrimWhitespace={this.props.hideWhitespaceInDiff}
+          />
+        ) : (
+          this.renderClassicCommitDiff()
+        )}
       </div>
+    )
+  }
+
+  private onToggleEditorDiff = () => {
+    const useEditorDiff = !this.state.useEditorDiff
+    setBoolean(useEditorDiffKey, useEditorDiff)
+    this.setState({ useEditorDiff })
+  }
+
+  /** Switch between Monaco's diff and the classic one, which stages lines. */
+  private renderDiffStyleToggle() {
+    const { useEditorDiff } = this.state
+    return (
+      <button
+        type="button"
+        className="diff-style-toggle"
+        aria-pressed={useEditorDiff}
+        onClick={this.onToggleEditorDiff}
+      >
+        <Octicon
+          symbol={useEditorDiff ? octicons.listUnordered : octicons.code}
+        />
+        {useEditorDiff ? 'Classic Diff' : 'Editor Diff'}
+      </button>
+    )
+  }
+
+  /** The two versions of the selected commit's file for the editor diff. */
+  private get commitDiffRevisions(): {
+    original: DiffRevision
+    modified: DiffRevision
+  } | null {
+    const { commitSelection, graphStashes } = this.props.state
+    const { file, diff, shas } = commitSelection
+    if (
+      file === null ||
+      diff === null ||
+      diff.kind !== DiffType.Text ||
+      shas.length !== 1 ||
+      this.getStashMap(graphStashes).has(shas[0])
+    ) {
+      return null
+    }
+    const sha = shas[0]
+    const { status } = file
+    const oldPath =
+      status.kind === AppFileStatusKind.Renamed ||
+      status.kind === AppFileStatusKind.Copied
+        ? status.oldPath
+        : file.path
+    return {
+      original:
+        status.kind === AppFileStatusKind.New
+          ? { kind: 'empty' }
+          : { kind: 'commit', commitish: `${sha}^`, path: oldPath },
+      modified:
+        status.kind === AppFileStatusKind.Deleted
+          ? { kind: 'empty' }
+          : { kind: 'commit', commitish: sha, path: file.path },
+    }
+  }
+
+  private renderClassicCommitDiff() {
+    const { file, diff } = this.props.state.commitSelection
+    if (file === null) {
+      return null
+    }
+    return (
+      <SeamlessDiffSwitcher
+        repository={this.props.repository}
+        imageDiffType={this.props.imageDiffType}
+        file={file}
+        diff={diff}
+        readOnly={true}
+        hideWhitespaceInDiff={this.props.hideWhitespaceInDiff}
+        showDiffCheckMarks={false}
+        showSideBySideDiff={this.props.showSideBySideDiff}
+        onOpenBinaryFile={this.props.onOpenBinaryFile}
+        onChangeImageDiffType={this.props.onChangeImageDiffType}
+        onHideWhitespaceInDiffChanged={this.onHideWhitespaceInDiffChanged}
+        onOpenSubmodule={this.props.onOpenSubmodule}
+      />
     )
   }
 
@@ -769,6 +923,9 @@ export class HistoryGraphView extends React.Component<
         onChangeImageDiffType={this.props.onChangeImageDiffType}
         onDiffOptionsOpened={this.props.onDiffOptionsOpened}
         onClose={this.closeWipFile}
+        editors={this.editors}
+        useEditorDiff={this.state.useEditorDiff}
+        diffStyleToggle={this.renderDiffStyleToggle()}
       />
     )
   }
@@ -785,6 +942,42 @@ export class HistoryGraphView extends React.Component<
     const showDiff =
       this.state.isDiffOpen && this.props.state.commitSelection.file !== null
     return showDiff ? this.renderDiff() : this.renderGraph()
+  }
+
+  /**
+   * The editor tabs once a file is open, keeping the graph mounted behind
+   * them so it keeps its scroll position.
+   */
+  private renderMain() {
+    const editors = this.editors
+    const tab = editors.activeTab
+    return (
+      <>
+        {editors.tabs.length > 0 && (
+          <EditorTabs
+            editors={editors}
+            externalEditorLabel={this.props.externalEditorLabel}
+            onOpenInExternalEditor={this.props.onOpenInExternalEditor}
+          />
+        )}
+        <div className="history-graph-tab-content" hidden={tab !== null}>
+          {this.renderCenter()}
+        </div>
+        {tab !== null && (
+          <CodeEditor
+            key={tab.path}
+            repository={this.props.repository}
+            dispatcher={this.props.dispatcher}
+            editors={editors}
+            tab={tab}
+            sideBySide={this.props.showSideBySideDiff}
+            hideWhitespace={this.props.hideWhitespaceInChangesDiff}
+            externalEditorLabel={this.props.externalEditorLabel}
+            onOpenInExternalEditor={this.props.onOpenInExternalEditor}
+          />
+        )}
+      </>
+    )
   }
 
   private onCloseRemoteForm = () => {
@@ -841,7 +1034,7 @@ export class HistoryGraphView extends React.Component<
         <div className="history-graph-center">
           {this.renderRemoteForm()}
           {this.renderConflictBar()}
-          <div className="history-graph-main">{this.renderCenter()}</div>
+          <div className="history-graph-main">{this.renderMain()}</div>
           {this.renderTerminal()}
         </div>
         {this.renderDetails()}

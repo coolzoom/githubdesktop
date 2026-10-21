@@ -19,6 +19,7 @@ import {
 import { GraphMenus, IGraphMenuContext } from './history-graph/graph-menus'
 import { IWipCommitOptions } from './history-graph/wip-panel'
 import { FileExplorer } from './file-explorer/file-explorer'
+import { getRepositoryEditors } from './editor/editor-store'
 import { runInTerminal } from './terminal-panel/terminal-sessions'
 import { TooltippedContent } from './lib/tooltipped-content'
 import { TooltipDirection } from './lib/tooltip'
@@ -462,6 +463,17 @@ export class RepositoryView extends React.Component<
   private onShowTerminalChanged = (show: boolean) =>
     this.props.dispatcher.setShowTerminalPanel(show)
 
+  private onOpenFile = (path: string, pin: boolean, isChanged: boolean) => {
+    getRepositoryEditors(this.props.repository).open(path, {
+      pin,
+      initialView: isChanged ? 'changes' : 'edit',
+    })
+  }
+
+  private onPathRenamed = (from: string, to: string) => {
+    getRepositoryEditors(this.props.repository).renamed(from, to)
+  }
+
   private onOpenInTerminal = (path: string) => {
     const { repository } = this.props
     this.props.dispatcher.setShowTerminalPanel(true)
@@ -525,6 +537,8 @@ export class RepositoryView extends React.Component<
               externalEditorLabel={this.props.externalEditorLabel}
               onOpenInExternalEditor={this.props.onOpenInExternalEditor}
               onOpenChangedFile={this.onOpenChangedFile}
+              onOpenFile={this.onOpenFile}
+              onPathRenamed={this.onPathRenamed}
               onOpenInTerminal={this.onOpenInTerminal}
             />
           ) : (
@@ -618,6 +632,7 @@ export class RepositoryView extends React.Component<
     return (
       <HistoryGraphView
         repository={this.props.repository}
+        externalEditorLabel={this.props.externalEditorLabel}
         dispatcher={this.props.dispatcher}
         state={this.props.state}
         menus={this.graphMenus}

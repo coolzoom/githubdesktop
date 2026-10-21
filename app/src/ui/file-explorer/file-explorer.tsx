@@ -198,6 +198,13 @@ interface IFileExplorerProps {
   readonly onOpenInExternalEditor: (path: string) => void
   /** Shows the working directory diff of a changed file */
   readonly onOpenChangedFile: (path: string) => void
+  /**
+   * Opens a file in an editor tab, as a preview unless `pin` is set; changed
+   * files start out showing their changes
+   */
+  readonly onOpenFile: (path: string, pin: boolean, isChanged: boolean) => void
+  /** Lets open tabs follow a file or folder that was renamed */
+  readonly onPathRenamed: (from: string, to: string) => void
   /** Opens the integrated terminal in a folder of the repository */
   readonly onOpenInTerminal: (path: string) => void
 }
@@ -336,27 +343,27 @@ export class FileExplorer extends React.Component<
 
   private onCollapseAll = () => this.setState({ expanded: new Set() })
 
+  private openFile(entry: IExplorerEntry, pin: boolean) {
+    const isChanged = this.decorations.fileDecorations.has(entry.path)
+    this.props.onOpenFile(entry.path, pin, isChanged)
+  }
+
   private open(entry: IExplorerEntry) {
-    const decoration = this.decorations.fileDecorations.get(entry.path)
-    if (decoration !== undefined) {
-      this.props.onOpenChangedFile(entry.path)
-    } else {
-      this.props.onOpenInExternalEditor(entry.path)
-    }
+    this.openFile(entry, true)
   }
 
   private onRowClick = (entry: IExplorerEntry) => {
     this.setState({ selected: entry.path })
     if (entry.isDirectory) {
       this.setExpanded(entry.path, !this.state.expanded.has(entry.path))
-    } else if (this.decorations.fileDecorations.has(entry.path)) {
-      this.props.onOpenChangedFile(entry.path)
+    } else {
+      this.openFile(entry, false)
     }
   }
 
   private onRowDoubleClick = (entry: IExplorerEntry) => {
     if (!entry.isDirectory) {
-      this.props.onOpenInExternalEditor(entry.path)
+      this.openFile(entry, true)
     }
   }
 
@@ -422,6 +429,7 @@ export class FileExplorer extends React.Component<
       } else {
         await Fs.mkdir(Path.dirname(fullTarget), { recursive: true })
         await Fs.rename(Path.join(repository.path, edit.path), fullTarget)
+        this.props.onPathRenamed(edit.path, target)
       }
     } catch (e) {
       dispatcher.postError(e instanceof Error ? e : new Error(`${e}`))
