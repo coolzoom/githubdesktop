@@ -12,6 +12,9 @@ import {
 } from '../../../src/lib/git/graph'
 import { getCommits } from '../../../src/lib/git'
 import {
+  addRemote,
+  editRemote,
+  getRemotePushUrl,
   dropCommits,
   renameStash,
   rewordCommit,
@@ -48,6 +51,25 @@ describe('history graph git', () => {
     assert.ok(shas.includes(feature))
     assert.ok(shas.includes(main))
     assert.equal(shas.length, 3)
+  })
+
+  it('adds, fetches and edits a remote with a separate push URL', async t => {
+    const upstream = await setupEmptyRepository(t)
+    const upstreamTip = await commitFile(upstream, 'a')
+    const repo = await setupEmptyRepository(t)
+
+    await addRemote(repo, 'upstream', upstream.path, '/tmp/push-target')
+    const branch = await git(upstream, 'branch', '--show-current')
+    assert.equal(
+      await git(repo, 'rev-parse', `upstream/${branch}`),
+      upstreamTip
+    )
+    assert.equal(await getRemotePushUrl(repo, 'upstream'), '/tmp/push-target')
+
+    await editRemote(repo, 'upstream', 'source', upstream.path, '')
+    assert.equal(await git(repo, 'remote'), 'source')
+    assert.equal(await getRemotePushUrl(repo, 'source'), null)
+    assert.equal(await git(repo, 'remote', 'get-url', 'source'), upstream.path)
   })
 
   it('lists stashes with their parents', async t => {

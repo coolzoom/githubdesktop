@@ -203,6 +203,75 @@ export function removeRemote(repository: Repository, name: string) {
   return git(['remote', 'remove', name], repository.path, 'removeRemote')
 }
 
+/** The push URL of a remote, or null when it pushes to its pull URL. */
+export async function getRemotePushUrl(repository: Repository, name: string) {
+  const result = await git(
+    ['config', '--get', `remote.${name}.pushurl`],
+    repository.path,
+    'getRemotePushUrl',
+    { successExitCodes: new Set([0, 1]) }
+  )
+  const url = result.stdout.trim()
+  return result.exitCode === 0 && url.length > 0 ? url : null
+}
+
+async function setRemotePushUrl(
+  repository: Repository,
+  name: string,
+  pushUrl: string
+) {
+  if (pushUrl.length > 0) {
+    await git(
+      ['remote', 'set-url', '--push', name, pushUrl],
+      repository.path,
+      'setRemotePushUrl'
+    )
+  } else {
+    await git(
+      ['config', '--unset-all', `remote.${name}.pushurl`],
+      repository.path,
+      'setRemotePushUrl',
+      { successExitCodes: new Set([0, 5]) }
+    )
+  }
+}
+
+/** Add a remote with an optional separate push URL and fetch it. */
+export async function addRemote(
+  repository: Repository,
+  name: string,
+  pullUrl: string,
+  pushUrl: string
+) {
+  await git(['remote', 'add', name, pullUrl], repository.path, 'addRemote')
+  if (pushUrl.length > 0) {
+    await setRemotePushUrl(repository, name, pushUrl)
+  }
+  await fetchRemote(repository, { name, url: pullUrl })
+}
+
+/**
+ * Rename a remote and change its URLs. An empty push URL makes the remote
+ * push to its pull URL.
+ */
+export async function editRemote(
+  repository: Repository,
+  oldName: string,
+  name: string,
+  pullUrl: string,
+  pushUrl: string
+) {
+  if (name !== oldName) {
+    await git(
+      ['remote', 'rename', oldName, name],
+      repository.path,
+      'editRemote'
+    )
+  }
+  await git(['remote', 'set-url', name, pullUrl], repository.path, 'editRemote')
+  await setRemotePushUrl(repository, name, pushUrl)
+}
+
 /** Write `git format-patch` output for the given commits to a chosen file. */
 export async function createPatch(
   repository: Repository,

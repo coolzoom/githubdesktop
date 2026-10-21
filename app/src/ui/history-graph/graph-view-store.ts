@@ -1,6 +1,14 @@
 import { Emitter, Disposable } from 'event-kit'
 import { Repository } from '../../models/repository'
+import { IRemote } from '../../models/remote'
 import { getBranchTracking, IBranchTracking } from '../../lib/git/graph'
+
+export interface IRemoteFormRequest {
+  /** The remote being edited, null when adding one */
+  readonly remote: IRemote | null
+  /** Changes on every open so the form resets */
+  readonly nonce: number
+}
 
 /** Per-repository view settings of the commit graph, persisted locally. */
 export interface IGraphRepoSettings {
@@ -78,6 +86,7 @@ class GraphViewStore {
     { key: string; value: ReadonlyMap<string, IBranchTracking> }
   >()
   private trackingInFlight = new Set<string>()
+  private remoteForms = new Map<number, IRemoteFormRequest>()
 
   public onDidUpdate(fn: () => void): Disposable {
     return this.emitter.on('did-update', fn)
@@ -208,6 +217,24 @@ class GraphViewStore {
 
   public get pendingScroll() {
     return this.scrollRequest
+  }
+
+  /** The add / edit remote form shown above the graph, if any. */
+  public getRemoteForm(repositoryId: number) {
+    return this.remoteForms.get(repositoryId) ?? null
+  }
+
+  /** Open the remote form; pass a remote to edit it, null to add one. */
+  public openRemoteForm(repositoryId: number, remote: IRemote | null) {
+    const nonce = (this.remoteForms.get(repositoryId)?.nonce ?? 0) + 1
+    this.remoteForms.set(repositoryId, { remote, nonce })
+    this.emit()
+  }
+
+  public closeRemoteForm(repositoryId: number) {
+    if (this.remoteForms.delete(repositoryId)) {
+      this.emit()
+    }
   }
 }
 

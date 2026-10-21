@@ -28,8 +28,13 @@ import {
 } from './graph-model'
 import { CommitGraph } from './commit-graph'
 import { CommitDetails } from './commit-details'
-import { graphViewStore, IGraphRepoSettings } from './graph-view-store'
+import {
+  graphViewStore,
+  IGraphRepoSettings,
+  IRemoteFormRequest,
+} from './graph-view-store'
 import { GraphMenus } from './graph-menus'
+import { RemoteForm } from './remote-form'
 
 const MinDetailsWidth = 240
 const MaxDetailsWidth = 700
@@ -60,6 +65,7 @@ interface IHistoryGraphViewState {
   readonly settings: IGraphRepoSettings
   readonly searchText: string
   readonly detailsWidth: number
+  readonly remoteForm: IRemoteFormRequest | null
 }
 
 /**
@@ -123,6 +129,7 @@ export class HistoryGraphView extends React.Component<
       settings: graphViewStore.getSettings(id),
       searchText: graphViewStore.getSearchText(id),
       detailsWidth: graphViewStore.columns.detailsWidth,
+      remoteForm: graphViewStore.getRemoteForm(id),
     }
   }
 
@@ -426,12 +433,34 @@ export class HistoryGraphView extends React.Component<
     )
   }
 
+  private onCloseRemoteForm = () => {
+    graphViewStore.closeRemoteForm(this.props.repository.id)
+  }
+
+  private renderRemoteForm() {
+    const { remoteForm } = this.state
+    if (remoteForm === null) {
+      return null
+    }
+    return (
+      <RemoteForm
+        key={remoteForm.nonce}
+        repository={this.props.repository}
+        dispatcher={this.props.dispatcher}
+        remotes={this.props.state.remotes}
+        remote={remoteForm.remote}
+        onClose={this.onCloseRemoteForm}
+      />
+    )
+  }
+
   public render() {
     const showDiff =
       this.state.isDiffOpen && this.props.state.commitSelection.file !== null
     return (
       <div id="history-graph-view" className="gk-theme">
         <div className="history-graph-center">
+          {this.renderRemoteForm()}
           {showDiff ? this.renderDiff() : this.renderGraph()}
         </div>
         {this.renderDetails()}

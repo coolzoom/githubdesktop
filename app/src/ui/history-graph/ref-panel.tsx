@@ -190,6 +190,33 @@ class VisibilityButton extends React.PureComponent<IVisibilityButtonProps> {
   }
 }
 
+interface ISectionActionProps {
+  readonly label: string
+  readonly onClick: () => void
+}
+
+/** A `+` button on a section header, e.g. Add Remote. */
+class SectionAction extends React.PureComponent<ISectionActionProps> {
+  private onClick = (event: React.MouseEvent) => {
+    event.stopPropagation()
+    this.props.onClick()
+  }
+
+  public render() {
+    return (
+      <TooltippedContent
+        className="section-action"
+        tagName="span"
+        tooltip={this.props.label}
+      >
+        <button aria-label={this.props.label} onClick={this.onClick}>
+          <Octicon symbol={octicons.plus} />
+        </button>
+      </TooltippedContent>
+    )
+  }
+}
+
 function renderTracking(tracking: IBranchTracking | undefined) {
   if (tracking === undefined) {
     return null
@@ -500,6 +527,10 @@ export class RefPanel extends React.Component<IRefPanelProps, IRefPanelState> {
     return items
   }
 
+  private onAddRemote = () => {
+    graphViewStore.openRemoteForm(this.props.repository.id, null)
+  }
+
   private renderSectionHeader(section: RefPanelSection, count: number) {
     return (
       <PanelRow
@@ -510,6 +541,9 @@ export class RefPanel extends React.Component<IRefPanelProps, IRefPanelState> {
       >
         {this.renderChevron(this.isCollapsed(section))}
         <span className="section-title">{SectionTitles[section]}</span>
+        {section === RefPanelSection.Remote ? (
+          <SectionAction label="Add remote" onClick={this.onAddRemote} />
+        ) : null}
         <span className="section-count">{count}</span>
       </PanelRow>
     )

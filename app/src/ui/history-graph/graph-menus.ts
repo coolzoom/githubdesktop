@@ -28,7 +28,6 @@ import {
   OpenWithDefaultProgramLabel,
   RevealInFileManagerLabel,
 } from '../lib/context-menu'
-import { RepositorySettingsTab } from '../repository-settings/repository-settings'
 import {
   getRefsBySha,
   GraphRefKind,
@@ -1093,7 +1092,7 @@ export class GraphMenus {
   }
 
   public showRemoteMenu(remote: IRemote) {
-    const { repository, dispatcher, state } = this.ctx
+    const { repository, state } = this.ctx
     const ids = state.branchesState.allBranches
       .filter(b => b.type === BranchType.Remote && b.remoteName === remote.name)
       .map(b => b.ref)
@@ -1105,12 +1104,7 @@ export class GraphMenus {
       separator,
       {
         label: t('Edit Remote…', 'Edit remote…'),
-        action: () =>
-          dispatcher.showPopup({
-            type: PopupType.RepositorySettings,
-            repository,
-            initialSelectedTab: RepositorySettingsTab.Remote,
-          }),
+        action: () => graphViewStore.openRemoteForm(repository.id, remote),
       },
       {
         label: t('Copy Remote URL', 'Copy remote URL'),
@@ -1179,12 +1173,7 @@ export class GraphMenus {
           },
           {
             label: t('Add Remote…', 'Add remote…'),
-            action: () =>
-              dispatcher.showPopup({
-                type: PopupType.RepositorySettings,
-                repository,
-                initialSelectedTab: RepositorySettingsTab.Remote,
-              }),
+            action: () => graphViewStore.openRemoteForm(repository.id, null),
           },
           separator,
           ...visibility,
