@@ -30,6 +30,22 @@ case "$MODE" in
     ;;
 esac
 
+# Node 的 fetch 不读取 macOS 系统代理，这里把系统 HTTPS 代理导出为环境变量
+if [ -z "${https_proxy:-}${HTTPS_PROXY:-}" ] && command -v scutil >/dev/null; then
+  _proxy_info="$(scutil --proxy)"
+  if echo "$_proxy_info" | grep -q "HTTPSEnable : 1"; then
+    _host="$(echo "$_proxy_info" | awk '/HTTPSProxy :/ {print $3}')"
+    _port="$(echo "$_proxy_info" | awk '/HTTPSPort :/ {print $3}')"
+    if [ -n "$_host" ] && [ -n "$_port" ]; then
+      export https_proxy="http://${_host}:${_port}" http_proxy="http://${_host}:${_port}"
+      export HTTPS_PROXY="$https_proxy" HTTP_PROXY="$http_proxy"
+      export NO_PROXY="${NO_PROXY:-localhost,127.0.0.1}" no_proxy="${no_proxy:-localhost,127.0.0.1}"
+    fi
+  fi
+  unset _proxy_info _host _port
+fi
+[ -n "${https_proxy:-}${HTTPS_PROXY:-}" ] && export NODE_USE_ENV_PROXY=1
+
 ARCH="$(uname -m)"
 [ "$ARCH" = "x86_64" ] && ARCH="x64"
 DIST_DIR="$ROOT/dist/${APP_NAME}-darwin-${ARCH}"
@@ -62,6 +78,16 @@ use_node() {
   command -v yarn >/dev/null || die "找不到 yarn，请先执行第 1 步"
 }
 
+# 根目录和 app/ 的 node_modules 都与 yarn.lock 一致，且 Electron 已下载
+# 传入 no-electron 时不检查 Electron
+deps_ready() {
+  [ -d node_modules ] && [ -d app/node_modules ] || return 1
+  yarn check --integrity >/dev/null 2>&1 || return 1
+  yarn --cwd app check --integrity >/dev/null 2>&1 || return 1
+  [ "${1:-}" = "no-electron" ] && return 0
+  [ -f node_modules/electron/path.txt ] && [ -d node_modules/electron/dist ]
+}
+
 # ---------------------------------------------------------------- 1. 安装环境
 step_setup() {
   info "[1] 安装环境"
@@ -81,9 +107,13 @@ step_setup() {
   fi
   ok "nvm $(nvm --version)"
 
-  info "安装 Node $(cat .nvmrc)…"
-  nvm install
-  nvm use
+  local node_version
+  node_version="$(cat .nvmrc)"
+  if [ "$(nvm version "$node_version")" = "N/A" ]; then
+    info "安装 Node $node_version…"
+    nvm install
+  fi
+  nvm use >/dev/null
   ok "node $(node -v)"
 
   if ! command -v yarn >/dev/null; then
@@ -102,8 +132,25 @@ step_setup() {
   fi
   ok "$(python3 --version)"
 
-  info "更新 git submodules…"
-  git submodule update --init --recursive
+  if git submodule status --recursive | grep -q '^-'; then
+    info "初始化 git submodules…"
+    git submodule update --init --recursive
+  fi
+  ok "git submodules"
+
+  if [ "${FORCE:-}" != "1" ] && deps_ready; then
+    ok "依赖已安装且与 yarn.lock 一致，跳过（FORCE=1 可强制重装）"
+    ok "环境安装完成"
+    return 0
+  fi
+
+  # 依赖完整、只差 Electron 二进制（通常是之前下载失败）时只补装 Electron
+  if [ "${FORCE:-}" != "1" ] && deps_ready no-electron; then
+    info "补装 Electron 二进制…"
+    node node_modules/electron/install.js
+    ok "环境安装完成"
+    return 0
+  fi
 
   # yarn 1 多个进程共用缓存并发解压会互相损坏文件（"Extracting tar content of undefined failed"）
   if pgrep -f "yarn.* install" >/dev/null; then
@@ -203,7 +250,7 @@ menu() {
   while true; do
     cat <<EOF
 
-${c_green}GitHub Desktop 构建工具${c_off}  (MODE=$MODE, 产物: ${APP_NAME}.app)
+${c_green}GitHub Desktop 构建工具${c_off}  (MODE=$MODE, 产物: ${APP_NAME}.app, 代理: ${https_proxy:-${HTTPS_PROXY:-无}})
   1) 安装环境     Xcode CLT / nvm / Node $(cat .nvmrc) / yarn / submodules / 依赖
   2) 编译         yarn build:$MODE
   3) 运行         启动编译好的应用
