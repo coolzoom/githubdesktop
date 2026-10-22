@@ -239,4 +239,9 @@
     color: var(--gk-text-secondary);
     font-size: 11px;
   }
+
+  #undo-commit {
+    flex-shrink: 0;
+    align-items: center;
+  }
 }

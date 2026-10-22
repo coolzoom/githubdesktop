@@ -29,6 +29,7 @@ import {
   IAutocompletionProvider,
 } from '../autocompletion'
 import { CommitMessage } from '../changes/commit-message'
+import { UndoCommit } from '../changes/undo-commit'
 import { Dispatcher } from '../dispatcher'
 import { Checkbox, CheckboxValue } from '../lib/checkbox'
 import { TooltippedContent } from '../lib/tooltipped-content'
@@ -535,7 +536,44 @@ export class WipPanel extends React.Component<IWipPanelProps> {
           </button>
         )}
         {this.renderCommitForm()}
+        {this.renderUndoCommit()}
       </div>
+    )
+  }
+
+  /** The most recent unpushed commit, which can be undone like in Changes. */
+  private get undoableCommit() {
+    const { localCommitSHAs, commitLookup, commitToAmend, changesState } =
+      this.props.state
+    if (commitToAmend !== null || changesState.conflictState !== null) {
+      return null
+    }
+    const sha = localCommitSHAs.length > 0 ? localCommitSHAs[0] : null
+    const commit = sha === null ? null : commitLookup.get(sha) ?? null
+    // A tagged commit wouldn't go away, so the original doesn't offer undo.
+    return commit !== null && commit.tags.length === 0 ? commit : null
+  }
+
+  private onUndoCommit = () => {
+    const commit = this.undoableCommit
+    if (commit !== null) {
+      this.props.dispatcher.undoCommit(this.props.repository, commit)
+    }
+  }
+
+  private renderUndoCommit() {
+    const commit = this.undoableCommit
+    if (commit === null) {
+      return null
+    }
+    return (
+      <UndoCommit
+        commit={commit}
+        emoji={this.props.emoji}
+        isPushPullFetchInProgress={this.props.state.isPushPullFetchInProgress}
+        isCommitting={this.props.state.isCommitting}
+        onUndo={this.onUndoCommit}
+      />
     )
   }
 }

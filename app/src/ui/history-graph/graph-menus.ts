@@ -5,7 +5,6 @@ import { Commit, CommitOneLine } from '../../models/commit'
 import { IRemote } from '../../models/remote'
 import { IGraphStash } from '../../models/stash-entry'
 import {
-  AppFileStatusKind,
   CommittedFileChange,
   WorkingDirectoryFileChange,
 } from '../../models/status'
@@ -1291,7 +1290,16 @@ export class GraphMenus {
     const fullPath = Path.join(repository.path, file.path)
     const exists = await pathExists(fullPath)
     const extension = Path.extname(file.path)
-    const isUntracked = file.status.kind === AppFileStatusKind.Untracked
+    const isGitIgnore = Path.basename(file.path) === '.gitignore'
+    // Git paths always use '/', even on Windows.
+    const folders = file.path.split('/').slice(0, -1)
+    const folderItems: IMenuItem[] = folders.map((_, index) => {
+      const folder = `/${folders.slice(0, folders.length - index).join('/')}`
+      return {
+        label: folder,
+        action: () => dispatcher.appendIgnoreFile(repository, folder),
+      }
+    })
 
     show([
       staged
@@ -1317,18 +1325,32 @@ export class GraphMenus {
       },
       separator,
       {
-        label: t('Ignore File', 'Ignore file'),
-        enabled: isUntracked,
+        label: t(
+          'Ignore File (Add to .gitignore)',
+          'Ignore file (add to .gitignore)'
+        ),
+        enabled: !isGitIgnore,
         action: () => dispatcher.appendIgnoreFile(repository, file.path),
       },
+      ...(folderItems.length > 0
+        ? [
+            {
+              label: t(
+                'Ignore Folder (Add to .gitignore)',
+                'Ignore folder (add to .gitignore)'
+              ),
+              enabled: !isGitIgnore,
+              submenu: folderItems,
+            },
+          ]
+        : []),
       ...(extension.length > 0
         ? [
             {
               label: t(
-                `Ignore All *${extension} Files`,
-                `Ignore all *${extension} files`
+                `Ignore All ${extension} Files (Add to .gitignore)`,
+                `Ignore all ${extension} files (add to .gitignore)`
               ),
-              enabled: isUntracked,
               action: () =>
                 dispatcher.appendIgnoreRule(repository, `*${extension}`),
             },
