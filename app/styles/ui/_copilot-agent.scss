@@ -46,6 +46,82 @@
     opacity: 0.4;
     cursor: default;
   }
+
+  &.selected {
+    color: var(--text-color);
+    background: var(--box-selected-background-color);
+  }
+}
+
+.copilot-agent-history {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0;
+}
+
+.copilot-agent-history-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 6px 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-color);
+
+  .copilot-agent-history-open {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    padding: 0 0 0 12px;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    > .octicon {
+      flex-shrink: 0;
+      color: var(--text-secondary-color);
+    }
+  }
+
+  .copilot-agent-history-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .copilot-agent-history-time {
+    flex-shrink: 0;
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary-color);
+  }
+
+  .copilot-agent-icon-button {
+    visibility: hidden;
+  }
+
+  &:hover,
+  &:focus-within {
+    background: var(--box-hover-background-color);
+
+    .copilot-agent-icon-button {
+      visibility: visible;
+    }
+  }
+
+  &.active {
+    background: var(--box-selected-background-color);
+  }
 }
 
 .copilot-agent-empty {

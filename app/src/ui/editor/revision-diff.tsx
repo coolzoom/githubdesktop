@@ -169,10 +169,15 @@ export class DocumentDiff extends React.Component<IDocumentDiffProps> {
     this.forceUpdate()
   }
 
+  /**
+   * Deferred because the child diff editor still holds the document's model
+   * until it has unmounted or switched models, which happens after this.
+   */
   private releaseDocument(editors: RepositoryEditors) {
-    if (this.document !== null) {
-      editors.release(this.document)
+    const document = this.document
+    if (document !== null) {
       this.document = null
+      window.setTimeout(() => editors.release(document), 0)
     }
   }
 

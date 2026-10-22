@@ -63,6 +63,49 @@ class ChatRow extends React.PureComponent<{
   }
 }
 
+interface IChatHistoryItemProps {
+  readonly session: CopilotAgentSession
+  readonly active: boolean
+  readonly onSelect: (session: CopilotAgentSession) => void
+  readonly onDelete: (session: CopilotAgentSession) => void
+}
+
+class ChatHistoryItem extends React.Component<IChatHistoryItemProps> {
+  private onSelect = () => this.props.onSelect(this.props.session)
+  private onDelete = () => this.props.onDelete(this.props.session)
+
+  public render() {
+    const { session, active } = this.props
+    return (
+      <div className={classNames('copilot-agent-history-item', { active })}>
+        <button
+          type="button"
+          className="copilot-agent-history-open"
+          onClick={this.onSelect}
+        >
+          <Octicon
+            symbol={
+              session.state.busy ? octicons.sync : octicons.commentDiscussion
+            }
+          />
+          <span className="copilot-agent-history-title">{session.title}</span>
+          <span className="copilot-agent-history-time">
+            {formatChatTime(session.createdAt)}
+          </span>
+        </button>
+        <button
+          type="button"
+          className="copilot-agent-icon-button"
+          aria-label="Delete chat"
+          onClick={this.onDelete}
+        >
+          <Octicon symbol={octicons.trash} />
+        </button>
+      </div>
+    )
+  }
+}
+
 /** VS Code-style Copilot agent chat for the current repository. */
 export class CopilotAgentPanel extends React.Component<
   ICopilotAgentPanelProps,
@@ -227,38 +270,13 @@ export class CopilotAgentPanel extends React.Component<
     return (
       <div className="copilot-agent-history">
         {sessions.map(session => (
-          <div
+          <ChatHistoryItem
             key={session.createdAt.getTime()}
-            className={classNames('copilot-agent-history-item', {
-              active: session === this.session,
-            })}
-            role="button"
-            tabIndex={0}
-            onClick={() => this.onSelectChat(session)}
-          >
-            <Octicon
-              symbol={
-                session.state.busy ? octicons.sync : octicons.commentDiscussion
-              }
-            />
-            <span className="copilot-agent-history-title">
-              {session.title}
-            </span>
-            <span className="copilot-agent-history-time">
-              {formatChatTime(session.createdAt)}
-            </span>
-            <button
-              type="button"
-              className="copilot-agent-icon-button"
-              aria-label="Delete chat"
-              onClick={event => {
-                event.stopPropagation()
-                this.onDeleteChat(session)
-              }}
-            >
-              <Octicon symbol={octicons.trash} />
-            </button>
-          </div>
+            session={session}
+            active={session === this.session}
+            onSelect={this.onSelectChat}
+            onDelete={this.onDeleteChat}
+          />
         ))}
       </div>
     )

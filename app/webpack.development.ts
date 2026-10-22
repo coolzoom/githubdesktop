@@ -41,13 +41,23 @@ const port = getPortOrDefault()
 const webpackHotModuleReloadUrl = `webpack-hot-middleware/client?path=http://localhost:${port}/__webpack_hmr`
 const publicPath = `http://localhost:${port}/build/`
 
-const rendererConfig = merge({}, common.renderer, config, {
+/**
+ * Standalone builds load the renderer from the app bundle instead of the
+ * `yarn start` dev server, so they work when copied to /Applications.
+ */
+const standalone = process.env.DESKTOP_STANDALONE === '1'
+
+const devServerConfig: webpack.Configuration = {
   entry: {
     renderer: [webpackHotModuleReloadUrl, getRendererEntryPoint()],
   },
   output: {
     publicPath,
   },
+  plugins: [new webpack.HotModuleReplacementPlugin()],
+}
+
+const rendererConfig = merge({}, common.renderer, config, {
   module: {
     rules: [
       // This will cause the compiled CSS (and sourceMap) to be
@@ -66,7 +76,7 @@ const rendererConfig = merge({}, common.renderer, config, {
   infrastructureLogging: {
     level: 'error',
   },
-  plugins: [new webpack.HotModuleReplacementPlugin()],
+  ...(standalone ? {} : devServerConfig),
 })
 
 const crashConfig = merge({}, common.crash, config, {

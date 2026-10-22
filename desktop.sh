@@ -167,9 +167,20 @@ step_setup() {
   ok "环境安装完成"
 }
 
+# dev 构建默认从 yarn start 的 localhost:3000 加载界面；独立构建把界面打包进应用，
+# 才能复制到 /Applications 单独运行
+is_standalone_build() {
+  [ -f "$APP_PATH/Contents/Resources/app/index.html" ] &&
+    ! grep -q "localhost:3000" "$APP_PATH/Contents/Resources/app/index.html"
+}
+
 # ---------------------------------------------------------------- 2. 编译
 step_build() {
-  info "[2] 编译 ($MODE)"
+  local kind=""
+  if [ "$MODE" = "dev" ]; then
+    if [ "${DESKTOP_STANDALONE:-}" = "1" ]; then kind=", 独立运行"; else kind=", 配合第 3 步开发服务器"; fi
+  fi
+  info "[2] 编译 ($MODE$kind)"
   use_node
   yarn "build:$MODE"
   [ -d "$APP_PATH" ] || die "编译完成但未找到 $APP_PATH"
@@ -181,6 +192,10 @@ step_run() {
   info "[3] 运行 ($MODE)"
   use_node
   [ -d "$APP_PATH" ] || die "未找到 $APP_PATH，请先执行第 2 步"
+  if [ "$MODE" = "dev" ] && is_standalone_build; then
+    info "当前是独立构建，开发模式需要连接开发服务器的构建，重新编译…"
+    DESKTOP_STANDALONE= step_build
+  fi
   if [ "$MODE" = "dev" ]; then
     info "启动开发模式（支持热更新，Cmd+Alt+R 重新加载，Ctrl+C 退出）"
     yarn start
@@ -203,6 +218,10 @@ step_package() {
 step_install() {
   info "[5] 复制到 /Applications"
   [ -d "$APP_PATH" ] || die "未找到 $APP_PATH，请先执行第 2 步"
+  if [ "$MODE" = "dev" ] && ! is_standalone_build; then
+    info "当前构建依赖 localhost:3000 开发服务器，重新编译为独立运行版本…"
+    DESKTOP_STANDALONE=1 step_build
+  fi
 
   if [ -d "$INSTALL_PATH" ]; then
     if [ "$MODE" = "prod" ]; then
@@ -225,7 +244,7 @@ step_install() {
 # ---------------------------------------------------------------- 6. 一键全部
 step_all() {
   step_setup
-  step_build
+  DESKTOP_STANDALONE=1 step_build
   step_package
   step_install
   info "启动 ${INSTALL_PATH}"
