@@ -566,6 +566,11 @@ export class GraphMenus {
                   'rebase'
                 )
               ),
+          },
+          {
+            label: t('Force Push', 'Force push'),
+            enabled: tracking === undefined || tracking.ahead > 0,
+            action: () => dispatcher.confirmOrForcePush(repository),
           }
         )
       }
