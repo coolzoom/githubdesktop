@@ -5,7 +5,12 @@ import { getProductName } from '../app/package-info'
 import { getDistPath, isPublishable } from './dist-info'
 import { isGitHubActions } from './build-platforms'
 
-if (isGitHubActions() && process.platform === 'darwin' && isPublishable()) {
+if (
+  isGitHubActions() &&
+  process.platform === 'darwin' &&
+  isPublishable() &&
+  process.env.DESKTOP_SKIP_CODE_SIGNING !== '1'
+) {
   const archive = `${getDistPath()}/${getProductName()}.app`
   try {
     console.log('validating signature of Desktop app')

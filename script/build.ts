@@ -71,6 +71,8 @@ import { copyCopilotDependency } from './copilot'
 
 const isPublishableBuild = isPublishable()
 const isDevelopmentBuild = getChannel() === 'development'
+const signForDistribution =
+  isPublishableBuild && process.env.DESKTOP_SKIP_CODE_SIGNING !== '1'
 const shouldSkipPackaging = process.env.DESKTOP_SKIP_PACKAGE === '1'
 
 const projectRoot = path.join(__dirname, '..')
@@ -98,7 +100,7 @@ generateLicenseMetadata(outRoot)
 
 moveAnalysisFiles()
 
-if (isGitHubActions() && process.platform === 'darwin' && isPublishableBuild) {
+if (isGitHubActions() && process.platform === 'darwin' && signForDistribution) {
   console.log('Setting up keychain…')
   cp.execSync(path.join(__dirname, 'setup-macos-keychain'))
 }
@@ -177,10 +179,10 @@ async function packageApp() {
   }
 
   // get notarization deets, unless we're not going to publish this
-  const osxNotarize = isPublishableBuild ? getNotarizationOptions() : undefined
+  const osxNotarize = signForDistribution ? getNotarizationOptions() : undefined
 
   if (
-    isPublishableBuild &&
+    signForDistribution &&
     isGitHubActions() &&
     process.platform === 'darwin' &&
     osxNotarize === undefined
@@ -233,13 +235,12 @@ async function packageApp() {
         hardenedRuntime: true,
         entitlements: entitlementsPath,
       }),
-      type: isPublishableBuild ? 'distribution' : 'development',
-      // For development, we will use '-' as the identifier so that codesign
-      // will sign the app to run locally. We need to disable 'identity-validation'
-      // or otherwise it will replace '-' with one of the regular codesigning
-      // identities in our system.
-      identity: isDevelopmentBuild ? '-' : undefined,
-      identityValidation: !isDevelopmentBuild,
+      type: signForDistribution ? 'distribution' : 'development',
+      // Without a Developer ID certificate, ad-hoc sign so the app can launch.
+      // identity-validation must stay off or codesign replaces '-' with a
+      // signing identity from the login keychain.
+      identity: signForDistribution ? undefined : '-',
+      identityValidation: signForDistribution,
     },
     osxNotarize,
     protocols: [

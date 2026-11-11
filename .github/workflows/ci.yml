@@ -81,10 +81,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14-xlarge, windows-2022]
+        os: [macos-latest, windows-2022]
         arch: [x64, arm64]
         include:
-          - os: macos-14-xlarge
+          - os: macos-latest
             friendlyName: macOS
           - os: windows-2022
             friendlyName: Windows
@@ -92,6 +92,13 @@ jobs:
     environment: ${{ inputs.environment }}
     env:
       RELEASE_CHANNEL: ${{ inputs.environment }}
+      DESKTOP_UPDATE_REPOSITORY: ${{ github.repository }}
+      # Fork pushes have no Apple or Azure certificates. Signed workflow_call
+      # deployments keep the official signing path.
+      DESKTOP_SKIP_CODE_SIGNING:
+        ${{ github.event_name == 'workflow_call' && inputs.sign && '0' || '1' }}
+      DESKTOP_SKIP_DELTA:
+        ${{ github.event_name == 'workflow_call' && inputs.sign && '0' || '1' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -140,7 +147,16 @@ jobs:
             ${{ secrets.GATEWATCHER_APP_STORE_CONNECT_API_ISSUER_ID }}
           app-store-connect-api-key-base64-private-key:
             ${{ secrets.GATEWATCHER_APP_STORE_CONNECT_API_BASE64_PRIVATE_KEY }}
+      - name: Set release version
+        if:
+          github.event_name == 'push' && github.ref == 'refs/heads/development'
+        shell: bash
+        run: |
+          base=$(node -p "require('./app/package.json').version")
+          echo "DESKTOP_APP_VERSION=${base}.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "Release version ${base}.${GITHUB_RUN_NUMBER}"
       - name: Build production app
+        id: compile
         run: yarn build:prod
         env:
           DESKTOP_OAUTH_CLIENT_ID: ${{ secrets.DESKTOP_OAUTH_CLIENT_ID }}
@@ -161,6 +177,7 @@ jobs:
           npm_config_arch: ${{ matrix.arch }}
           TARGET_ARCH: ${{ matrix.arch }}
       - name: Prepare testing environment
+        id: test-setup
         run: yarn test:setup
         env:
           npm_config_arch: ${{ matrix.arch }}
@@ -170,13 +187,19 @@ jobs:
         run: yarn test:unit
       - name: Run script tests
         run: yarn test:script
-      - if: runner.os == 'Windows'
+      - if:
+          ${{ !cancelled() && runner.os == 'Windows' && steps.compile.outcome ==
+          'success' }}
         uses: ./.github/actions/setup-windows-signing
         with:
           enabled: ${{ inputs.sign }}
           azure-client-id: ${{ secrets.AZURE_CODE_SIGNING_CLIENT_ID }}
           azure-tenant-id: ${{ secrets.AZURE_CODE_SIGNING_TENANT_ID }}
       - name: Package production app
+        id: package
+        if:
+          ${{ !cancelled() && steps.compile.outcome == 'success' &&
+          steps.test-setup.outcome == 'success' }}
         run: yarn package
         env:
           npm_config_arch: ${{ matrix.arch }}
@@ -184,7 +207,9 @@ jobs:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CODE_SIGNING_CLIENT_ID }}
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
-        if: ${{ inputs.upload-artifacts }}
+        if:
+          ${{ !cancelled() && steps.package.outcome == 'success' &&
+          (github.event_name == 'push' || inputs.upload-artifacts) }}
         with:
           name: ${{matrix.friendlyName}}-${{matrix.arch}}
           path: |
@@ -205,7 +230,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14-xlarge
+          - os: macos-latest
             friendlyName: macOS
             arch: arm64
           - os: windows-2022
@@ -355,3 +380,64 @@ jobs:
           name: e2e-${{matrix.friendlyName}}-${{matrix.arch}}
           path: playwright-videos/**
           if-no-files-found: warn
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    if: >-
+      !cancelled() && github.event_name == 'push' && github.ref ==
+      'refs/heads/development'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          base=$(node -p "require('./app/package.json').version")
+          version="${base}.${GITHUB_RUN_NUMBER}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${version}" >> "$GITHUB_OUTPUT"
+      - name: Download build artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '{macOS,Windows}-*'
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          mapfile -t files < <(find release-assets -type f \( -name '*.zip' -o -name '*.exe' -o -name '*.msi' -o -name '*.nupkg' \) | sort)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::error::No macOS or Windows installers were produced."
+            exit 1
+          fi
+
+          zip_count=$(printf '%s\n' "${files[@]}" | grep -c '\.zip$' || true)
+          exe_count=$(printf '%s\n' "${files[@]}" | grep -c 'Setup-.*\.exe$' || true)
+          if [ "$zip_count" -lt 1 ] || [ "$exe_count" -lt 1 ]; then
+            echo "::error::Need at least one macOS zip and one Windows setup exe. Found ${zip_count} zip(s) and ${exe_count} setup exe(s)."
+            exit 1
+          fi
+
+          cat > release-notes.md <<EOF
+          自动构建 \`${GITHUB_REF_NAME}\` @ \`${GITHUB_SHA}\`
+
+          - macOS：下载 \`GitHub Desktop-<arch>.zip\`，解压后把 GitHub Desktop.app 放进“应用程序”
+          - Windows：下载 \`GitHubDesktopSetup-<arch>.exe\` 并运行
+
+          Desktop-Update-Sha: ${GITHUB_SHA}
+          EOF
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${files[@]}" --clobber
+          else
+            gh release create "$TAG" "${files[@]}" \
+              --title "GitHub Desktop ${VERSION}" \
+              --notes-file release-notes.md \
+              --latest
+          fi

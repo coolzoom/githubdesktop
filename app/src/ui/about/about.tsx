@@ -89,10 +89,9 @@ class UpdateInfo extends React.Component<IUpdateInfoProps> {
  */
 export class About extends React.Component<IAboutProps> {
   private get canCheckForUpdates() {
-    return (
-      __RELEASE_CHANNEL__ !== 'development' ||
-      this.props.allowDevelopment === true
-    )
+    // Development builds check the same GitHub Releases feed as packaged builds.
+    // Linux packages are not published by the release workflow.
+    return !__LINUX__ || this.props.allowDevelopment === true
   }
 
   private renderUpdateButton() {
@@ -103,14 +102,17 @@ export class About extends React.Component<IAboutProps> {
     const updateStatus = this.props.updateState.status
 
     switch (updateStatus) {
-      case UpdateStatus.UpdateReady:
+      case UpdateStatus.UpdateReady: {
+        const label = this.props.updateState.downloadUrl
+          ? 'Download Update'
+          : 'Quit and Install Update'
+
         return (
           <Row>
-            <Button onClick={this.props.onQuitAndInstall}>
-              Quit and Install Update
-            </Button>
+            <Button onClick={this.props.onQuitAndInstall}>{label}</Button>
           </Row>
         )
+      }
       case UpdateStatus.UpdateNotAvailable:
       case UpdateStatus.CheckingForUpdates:
       case UpdateStatus.UpdateAvailable:
@@ -147,12 +149,7 @@ export class About extends React.Component<IAboutProps> {
     }
 
     if (!this.canCheckForUpdates) {
-      return (
-        <p>
-          The application is currently running in development and will not
-          receive any updates.
-        </p>
-      )
+      return <p>Updates are not available for this operating system.</p>
     }
 
     const { status, lastSuccessfulCheck } = this.props.updateState
@@ -185,10 +182,21 @@ export class About extends React.Component<IAboutProps> {
             richMessage={richMessage}
           />
         )
-      case UpdateStatus.UpdateReady:
+      case UpdateStatus.UpdateReady: {
+        if (this.props.updateState.downloadUrl) {
+          const availableVersion = this.props.updateState.availableVersion
+          const message =
+            availableVersion === null
+              ? 'An update is available to download.'
+              : `Version ${availableVersion} is available to download.`
+
+          return <UpdateInfo message={message} />
+        }
+
         return (
           <UpdateInfo message="An update has been downloaded and is ready to be installed." />
         )
+      }
       case UpdateStatus.UpdateNotChecked:
         return null
       default:

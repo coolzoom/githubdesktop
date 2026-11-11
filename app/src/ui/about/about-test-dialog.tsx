@@ -37,6 +37,9 @@ export class AboutTestDialog extends React.Component<
         newReleases: [],
         prioritizeUpdate: false,
         prioritizeUpdateInfoUrl: undefined,
+        availableVersion: null,
+        downloadUrl: null,
+        releaseUrl: null,
       },
     }
   }
@@ -51,7 +54,9 @@ export class AboutTestDialog extends React.Component<
   }
 
   public render() {
-    const version = __DEV__ ? __SHA__.substring(0, 10) : getVersion()
+    const version = __DEV__
+      ? `${getVersion()} (${__SHA__.substring(0, 10)})`
+      : getVersion()
 
     return (
       <About

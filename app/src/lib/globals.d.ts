@@ -50,6 +50,12 @@ declare const __RELEASE_CHANNEL__:
 /** The URL for Squirrel's updates. */
 declare const __UPDATES_URL__: string
 
+/**
+ * owner/name repository whose GitHub Releases are checked for updates.
+ * Example: `coolzoom/githubdesktop`.
+ */
+declare const __UPDATE_REPOSITORY__: string
+
 /** The URL for fatal exception reports. */
 declare const __ERROR_REPORTING_ENDPOINT__: string | undefined
 

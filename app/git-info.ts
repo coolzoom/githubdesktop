@@ -143,6 +143,13 @@ export function getSHA(gitPath = Path.resolve(__dirname, '../.git')) {
     return circleSHA
   }
 
+  // Actions checks out the commit being built. Prefer that SHA so it matches
+  // the Desktop-Update-Sha marker published with the GitHub Release.
+  const githubSHA = process.env.GITHUB_SHA
+  if (githubSHA != null && /^[0-9a-f]{40}$/i.test(githubSHA)) {
+    return githubSHA.toLowerCase()
+  }
+
   const { gitDir, commonGitDir } = resolveGitDirectories(gitPath)
 
   return revParse(gitDir, commonGitDir, 'HEAD')

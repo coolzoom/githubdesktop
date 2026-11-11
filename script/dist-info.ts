@@ -145,6 +145,12 @@ export function getUpdatesURL() {
 }
 
 export function shouldMakeDelta() {
+  // Fork releases are published to GitHub Releases, which is not a Squirrel
+  // delta feed. Official production and beta channels still build deltas.
+  if (process.env.DESKTOP_SKIP_DELTA === '1') {
+    return false
+  }
+
   // Only production and beta channels include deltas. Test releases aren't
   // necessarily sequential so deltas wouldn't make sense.
   return ['production', 'beta'].includes(getChannel())

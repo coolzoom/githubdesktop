@@ -24,6 +24,7 @@ import { offsetFromNow } from '../../lib/offset-from'
 import { gte, SemVer } from 'semver'
 import { getVersion } from './app-proxy'
 import { getUserAgent } from '../../lib/http'
+import { fetchNewerGitHubRelease } from '../../lib/github-release-update'
 
 /** The last version a showcase was seen. */
 export const lastShowCaseVersionSeen = 'version-of-last-showcase'
@@ -53,6 +54,12 @@ export interface IUpdateState {
   newReleases: ReadonlyArray<ReleaseSummary> | null
   prioritizeUpdate: boolean
   prioritizeUpdateInfoUrl: string | undefined
+  /** Version found on GitHub Releases, when one is newer than this build. */
+  availableVersion: string | null
+  /** Installer or release page to open. Null when Squirrel already downloaded it. */
+  downloadUrl: string | null
+  /** GitHub Release page for the available update. */
+  releaseUrl: string | null
 }
 
 /** A store which contains the current state of the auto updater. */
@@ -67,6 +74,9 @@ class UpdateStore {
   private userInitiatedUpdate = true
   private _prioritizeUpdate = false
   private _prioritizeUpdateInfoUrl: string | undefined = undefined
+  private availableVersion: string | null = null
+  private downloadUrl: string | null = null
+  private releaseUrl: string | null = null
 
   public get prioritizeUpdate() {
     return this._prioritizeUpdate
@@ -185,6 +195,9 @@ class UpdateStore {
       isX64ToARM64ImmediateAutoUpdate: this.isX64ToARM64ImmediateAutoUpdate,
       prioritizeUpdate: this.prioritizeUpdate,
       prioritizeUpdateInfoUrl: this.prioritizeUpdateInfoUrl,
+      availableVersion: this.availableVersion,
+      downloadUrl: this.downloadUrl,
+      releaseUrl: this.releaseUrl,
     }
   }
 
@@ -198,6 +211,13 @@ class UpdateStore {
    *                       attempt to retrieve the latest available deployment.
    */
   public async checkForUpdates(inBackground: boolean, skipGuidCheck: boolean) {
+    // Packaged and dev builds both ask this repository's GitHub Releases for
+    // a newer version. E2E keeps the local Squirrel feed.
+    if (this.usesGitHubReleaseUpdates()) {
+      await this.checkGitHubReleaseUpdates(inBackground)
+      return
+    }
+
     // An update has been downloaded and the app is waiting to be restarted.
     // Checking for updates again may result in the running app being nuked
     // when it finds a subsequent update on Windows, or the "Quit and Update"
@@ -220,6 +240,59 @@ class UpdateStore {
 
     if (error !== undefined) {
       this.emitError(error)
+    }
+  }
+
+  /**
+   * E2E points __UPDATES_URL__ at a local mock. Every other build, including
+   * development, checks GitHub Releases instead of central.github.com.
+   */
+  private usesGitHubReleaseUpdates() {
+    return !__UPDATES_URL__.startsWith('http://127.0.0.1')
+  }
+
+  private async checkGitHubReleaseUpdates(inBackground: boolean) {
+    this.userInitiatedUpdate = !inBackground
+    this.status = UpdateStatus.CheckingForUpdates
+    this.emitDidChange()
+
+    const platform = __DARWIN__ ? 'darwin' : __WIN32__ ? 'win32' : 'linux'
+
+    try {
+      const update = await fetchNewerGitHubRelease({
+        repository: __UPDATE_REPOSITORY__,
+        currentVersion: getVersion(),
+        currentSha: __SHA__,
+        platform,
+        arch: process.arch,
+        userAgent: getUserAgent(),
+      })
+
+      this.touchLastChecked()
+
+      if (update === null) {
+        this.availableVersion = null
+        this.downloadUrl = null
+        this.releaseUrl = null
+        this.status = UpdateStatus.UpdateNotAvailable
+      } else {
+        this.availableVersion = update.version
+        this.downloadUrl = update.assetUrl ?? update.htmlUrl
+        this.releaseUrl = update.htmlUrl
+        this.status = UpdateStatus.UpdateReady
+      }
+
+      this.emitDidChange()
+    } catch (error) {
+      this.status = UpdateStatus.UpdateNotAvailable
+      this.emitDidChange()
+      log.error('Failed checking GitHub releases for updates', error)
+
+      if (!inBackground) {
+        this.emitError(
+          error instanceof Error ? error : new Error(String(error))
+        )
+      }
     }
   }
 

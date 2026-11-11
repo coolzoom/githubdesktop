@@ -70,6 +70,13 @@ export class UpdateAvailable extends React.Component<IUpdateAvailableProps> {
   }
 
   private renderMessage = () => {
+    if (
+      updateStore.state.downloadUrl !== null ||
+      updateStore.state.releaseUrl !== null
+    ) {
+      return this.renderGitHubReleaseMessage()
+    }
+
     if (this.props.isX64ToARM64ImmediateAutoUpdate) {
       return (
         <span onSubmit={this.updateNow}>
@@ -140,6 +147,19 @@ export class UpdateAvailable extends React.Component<IUpdateAvailableProps> {
     )
   }
 
+  private renderGitHubReleaseMessage() {
+    const version = updateStore.state.availableVersion
+    const versionText = version === null ? '' : ` (${version})`
+
+    return (
+      <span>
+        An updated version of GitHub Desktop{versionText} is available. See{' '}
+        <LinkButton onClick={this.showReleaseNotes}>what's new</LinkButton> or{' '}
+        <LinkButton onClick={this.updateNow}>download the update</LinkButton>.
+      </span>
+    )
+  }
+
   private dismissUpdateShowCaseVisibility = () => {
     // Note: under that scenario that this is being dismissed due to clicking
     // what's new on a pending release and for some reason we don't have the
@@ -156,6 +176,12 @@ export class UpdateAvailable extends React.Component<IUpdateAvailableProps> {
   }
 
   private showReleaseNotes = () => {
+    const releaseUrl = updateStore.state.releaseUrl
+    if (releaseUrl) {
+      shell.openExternal(releaseUrl)
+      return
+    }
+
     if (this.props.newReleases == null) {
       // if, for some reason we're not able to render the release notes we
       // should redirect the user to the website so we do _something_
@@ -171,6 +197,12 @@ export class UpdateAvailable extends React.Component<IUpdateAvailableProps> {
   }
 
   private updateNow = () => {
+    const { downloadUrl, releaseUrl } = updateStore.state
+    if (downloadUrl !== null || releaseUrl !== null) {
+      shell.openExternal(downloadUrl ?? releaseUrl ?? '')
+      return
+    }
+
     if (
       (__RELEASE_CHANNEL__ === 'development' ||
         __RELEASE_CHANNEL__ === 'test') &&

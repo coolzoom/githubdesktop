@@ -332,11 +332,10 @@ export class App extends React.Component<IAppProps, IAppState> {
     updateStore.onDidChange(async state => {
       const status = state.status
 
-      if (
-        !(__RELEASE_CHANNEL__ === 'development') &&
-        status === UpdateStatus.UpdateReady
-      ) {
+      if (status === UpdateStatus.UpdateReady) {
         this.props.dispatcher.setUpdateBannerVisibility(true)
+      } else if (status === UpdateStatus.UpdateNotAvailable) {
+        this.props.dispatcher.setUpdateBannerVisibility(false)
       }
 
       if (
@@ -394,11 +393,8 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     this.props.dispatcher.installGlobalLFSFilters(false)
 
-    // We only want to automatically check for updates on beta and prod
-    if (
-      __RELEASE_CHANNEL__ !== 'development' &&
-      __RELEASE_CHANNEL__ !== 'test'
-    ) {
+    // Dev and packaged builds both check GitHub Releases. Linux is not published.
+    if (!__LINUX__) {
       setInterval(() => this.checkForUpdates(true), UpdateCheckInterval)
       this.checkForUpdates(true)
     } else if (await updateStore.isUpdateShowcase()) {
@@ -663,7 +659,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     inBackground: boolean,
     skipGuidCheck: boolean = false
   ) {
-    if (__LINUX__ || __RELEASE_CHANNEL__ === 'development') {
+    if (__LINUX__) {
       return
     }
 
@@ -1979,7 +1975,9 @@ export class App extends React.Component<IAppProps, IAppState> {
           />
         )
       case PopupType.About:
-        const version = __DEV__ ? __SHA__.substring(0, 10) : getVersion()
+        const version = __DEV__
+          ? `${getVersion()} (${__SHA__.substring(0, 10)})`
+          : getVersion()
 
         return (
           <About
@@ -3296,7 +3294,15 @@ export class App extends React.Component<IAppProps, IAppState> {
     this.props.dispatcher.showPopup({ type: PopupType.TermsAndConditions })
   }
 
-  private onQuitAndInstall = () => updateStore.quitAndInstallUpdate()
+  private onQuitAndInstall = () => {
+    const { downloadUrl, releaseUrl } = updateStore.state
+    if (downloadUrl !== null || releaseUrl !== null) {
+      shell.openExternal(downloadUrl ?? releaseUrl ?? '')
+      return
+    }
+
+    updateStore.quitAndInstallUpdate()
+  }
 
   private renderPopups() {
     const popupContent = this.allPopupContent()
